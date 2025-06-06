@@ -7,82 +7,84 @@ export default function TASLoginTerminal() {
     const [campoActivo, setCampoActivo] = useState('nis');
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(false);
-    const [mostrarBienvenida, setMostrarBienvenida] = useState(true);
 
+    const [modoSuspendido, setModoSuspendido] = useState(true);
+    const [mostrarBienvenida, setMostrarBienvenida] = useState(false);
+
+    // ⏱ Inactividad -> suspensión
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setMostrarBienvenida(false);
-        }, 2000);
-        return () => clearTimeout(timer);
-    }, []);
+        let inactividadTimer;
 
-    // Efecto para manejar el teclado físico
+        const resetInactividad = () => {
+            clearTimeout(inactividadTimer);
+            inactividadTimer = setTimeout(() => {
+                setModoSuspendido(true);
+                setNis('');
+                setSocio('');
+                setCampoActivo('nis');
+                setError('');
+            }, 2 * 60 * 1000);
+        };
+
+        const handleUserInteraction = () => {
+            if (modoSuspendido) {
+                setModoSuspendido(false);
+                setMostrarBienvenida(true);
+            }
+            resetInactividad();
+        };
+
+        window.addEventListener('mousedown', handleUserInteraction);
+        window.addEventListener('touchstart', handleUserInteraction);
+        window.addEventListener('keydown', handleUserInteraction);
+
+        resetInactividad();
+
+        return () => {
+            window.removeEventListener('mousedown', handleUserInteraction);
+            window.removeEventListener('touchstart', handleUserInteraction);
+            window.removeEventListener('keydown', handleUserInteraction);
+            clearTimeout(inactividadTimer);
+        };
+    }, [modoSuspendido]);
+
+    // ⏳ Bienvenida 2 segundos
+    useEffect(() => {
+        if (mostrarBienvenida) {
+            const timer = setTimeout(() => {
+                setMostrarBienvenida(false);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [mostrarBienvenida]);
+
+    // ⌨️ Teclado físico
     useEffect(() => {
         const handleKeyDown = (event) => {
-            // Solo procesar si no estamos en modo de carga y no es la pantalla de bienvenida
             if (cargando || mostrarBienvenida) return;
-
             const key = event.key;
-
-            // Prevenir comportamiento por defecto para las teclas que manejamos
-            if (
-                /^[0-9]$/.test(key) ||
-                key === 'Backspace' ||
-                key === 'Delete' ||
-                key === 'Enter' ||
-                key === 'Tab'
-            ) {
-                event.preventDefault();
-            }
-
-            // Números del 0-9
-            if (/^[0-9]$/.test(key)) {
-                handleInput(key);
-            }
-            // Backspace o Delete para borrar
-            else if (key === 'Backspace' || key === 'Delete') {
-                handleBackspace();
-            }
-            // Enter para enviar
-            else if (key === 'Enter') {
-                handleSubmit();
-            }
-            // Tab para cambiar entre campos
+            if (/^[0-9]$/.test(key)) handleInput(key);
+            else if (key === 'Backspace' || key === 'Delete') handleBackspace();
+            else if (key === 'Enter') handleSubmit();
             else if (key === 'Tab') {
                 setCampoActivo(campoActivo === 'nis' ? 'socio' : 'nis');
                 setError('');
-            }
-            // Escape para limpiar
-            else if (key === 'Escape') {
-                handleClear();
-            }
+            } else if (key === 'Escape') handleClear();
         };
 
-        // Agregar el event listener
         window.addEventListener('keydown', handleKeyDown);
-
-        // Cleanup: remover el event listener cuando el componente se desmonte
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [nis, socio, campoActivo, cargando, mostrarBienvenida]); // Dependencias necesarias
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [campoActivo, nis, socio, cargando, mostrarBienvenida]);
 
     const handleInput = (val) => {
-        if (campoActivo === 'nis' && nis.length < 12) {
-            setNis(nis + val);
-        }
-        if (campoActivo === 'socio' && socio.length < 8) {
-            setSocio(socio + val);
-        }
+        if (campoActivo === 'nis' && nis.length < 12) setNis(nis + val);
+        if (campoActivo === 'socio' && socio.length < 8) setSocio(socio + val);
         setError('');
     };
 
     const handleBackspace = () => {
-        if (campoActivo === 'nis') {
-            setNis(nis.slice(0, -1));
-        } else {
-            setSocio(socio.slice(0, -1));
-        }
+        if (campoActivo === 'nis') setNis(nis.slice(0, -1));
+        else setSocio(socio.slice(0, -1));
         setError('');
     };
 
@@ -93,19 +95,14 @@ export default function TASLoginTerminal() {
     };
 
     const handleSubmit = () => {
-        if (!nis && !socio) {
-            return setError('DEBE INGRESAR AL MENOS UN DATO');
-        }
-        if (nis && nis.length !== 12) {
+        if (!nis && !socio) return setError('DEBE INGRESAR AL MENOS UN DATO');
+        if (nis && nis.length !== 12)
             return setError('NIS DEBE TENER 12 DÍGITOS');
-        }
-
         setError('');
         setCargando(true);
 
         setTimeout(() => {
             setCargando(false);
-            // Aquí iría la lógica de autenticación real
             alert(
                 `CONSULTA REALIZADA:\nNIS: ${nis || 'NO INGRESADO'}\nSOCIO: ${
                     socio || 'NO INGRESADO'
@@ -119,6 +116,20 @@ export default function TASLoginTerminal() {
         setError('');
     };
 
+    // 🎞️ Modo suspendido
+    if (modoSuspendido) {
+        return (
+            <div className='fixed inset-0 bg-black flex items-center justify-center z-50'>
+                <img
+                    src='/QR COOPE.gif'
+                    alt='Pantalla suspendida'
+                    className='w-full h-full object-cover'
+                />
+            </div>
+        );
+    }
+
+    // 👋 Pantalla bienvenida
     if (mostrarBienvenida) {
         return (
             <div className='fixed inset-0 bg-gradient-to-br from-green-900 via-green-800 to-lime-700 flex items-center justify-center'>
@@ -138,9 +149,10 @@ export default function TASLoginTerminal() {
         );
     }
 
+    // ✅ Pantalla principal
     return (
         <div className='fixed inset-0 bg-gradient-to-br from-green-900 via-green-800 to-lime-700 text-white flex flex-col'>
-            {/* Header */}
+            {/* HEADER */}
             <div className='bg-gradient-to-r from-green-800 to-lime-600 p-6 shadow-lg'>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-4'>
@@ -148,7 +160,6 @@ export default function TASLoginTerminal() {
                             <span className='text-2xl text-green-800'>🏦</span>
                         </div>
                     </div>
-
                     <div className='text-center'>
                         <h1 className='text-2xl font-bold'>
                             TERMINAL DE AUTOSERVICIO
@@ -157,7 +168,6 @@ export default function TASLoginTerminal() {
                             Consulta de Estado de Cuenta
                         </p>
                     </div>
-
                     <div className='text-right text-sm text-green-100'>
                         <div>{new Date().toLocaleDateString()}</div>
                         <div>{new Date().toLocaleTimeString()}</div>
@@ -165,16 +175,16 @@ export default function TASLoginTerminal() {
                 </div>
             </div>
 
-            {/* Contenido principal */}
+            {/* FORM + TECLADO */}
             <div className='flex-1 flex'>
-                {/* Panel izquierdo - Formulario */}
+                {/* FORM */}
                 <div className='w-1/2 p-8 flex flex-col justify-center'>
                     <div className='max-w-md mx-auto w-full'>
                         <h2 className='text-3xl font-bold mb-8 text-center'>
                             INGRESE SUS DATOS
                         </h2>
 
-                        {/* Campo NIS */}
+                        {/* NIS */}
                         <div
                             className={`mb-6 p-6 rounded-xl border-4 cursor-pointer transition-all duration-300 ${
                                 campoActivo === 'nis'
@@ -202,7 +212,7 @@ export default function TASLoginTerminal() {
                             </p>
                         </div>
 
-                        {/* Campo Socio */}
+                        {/* SOCIO */}
                         <div
                             className={`mb-6 p-6 rounded-xl border-4 cursor-pointer transition-all duration-300 ${
                                 campoActivo === 'socio'
@@ -230,7 +240,7 @@ export default function TASLoginTerminal() {
                             </p>
                         </div>
 
-                        {/* Error */}
+                        {/* ERROR */}
                         {error && (
                             <div className='mb-6 p-4 bg-red-600/20 border-2 border-red-500 rounded-xl'>
                                 <div className='flex items-center gap-2'>
@@ -244,23 +254,12 @@ export default function TASLoginTerminal() {
                     </div>
                 </div>
 
-                {/* Panel derecho - Teclado */}
+                {/* TECLADO */}
                 <div className='w-1/2 p-8 bg-green-800/30'>
                     <div className='max-w-md mx-auto'>
                         <h3 className='text-2xl font-bold mb-6 text-center'>
                             TECLADO NUMÉRICO
                         </h3>
-
-                        {/* Instrucciones de teclado físico */}
-                        {/* <div className='mb-4 p-3 bg-lime-900/30 rounded-lg border border-lime-600'>
-                            <p className='text-sm text-lime-200 text-center'>
-                                💡 Use su teclado: <strong>Tab</strong> para
-                                cambiar campo • <strong>Enter</strong> para
-                                consultar • <strong>Esc</strong> para limpiar
-                            </p>
-                        </div> */}
-
-                        {/* Teclado numérico */}
                         <div className='grid grid-cols-3 gap-4 mb-6'>
                             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                                 <button
@@ -272,8 +271,6 @@ export default function TASLoginTerminal() {
                                 </button>
                             ))}
                         </div>
-
-                        {/* Fila inferior del teclado */}
                         <div className='grid grid-cols-3 gap-4 mb-6'>
                             <button
                                 onClick={handleClear}
@@ -294,8 +291,6 @@ export default function TASLoginTerminal() {
                                 BORRAR
                             </button>
                         </div>
-
-                        {/* Botón de consulta */}
                         <div className='space-y-3'>
                             <button
                                 onClick={handleSubmit}
@@ -320,7 +315,7 @@ export default function TASLoginTerminal() {
                 </div>
             </div>
 
-            {/* Footer */}
+            {/* FOOTER */}
             <div className='bg-green-900 p-4 text-center text-green-200 text-sm'>
                 <p>🔒 Conexión segura • Tiempo de sesión restante: ∞</p>
             </div>
