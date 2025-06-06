@@ -94,22 +94,36 @@ export default function TASLoginTerminal() {
         setError('');
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!nis && !socio) return setError('DEBE INGRESAR AL MENOS UN DATO');
         if (nis && nis.length !== 12)
             return setError('NIS DEBE TENER 12 DÍGITOS');
+
         setError('');
         setCargando(true);
 
-        setTimeout(() => {
-            setCargando(false);
-            alert(
-                `CONSULTA REALIZADA:\nNIS: ${nis || 'NO INGRESADO'}\nSOCIO: ${
-                    socio || 'NO INGRESADO'
-                }`
-            );
-        }, 3000);
+        try {
+            const response = await fetch(`/api/facturas?nis=${nis}`);
+
+            if (!response.ok) throw new Error('Error al consultar');
+
+            const data = await response.json();
+
+            if (!data || data.length === 0) {
+                setError('NIS INCORRECTO O SIN DATOS');
+            } else {
+                localStorage.setItem('nis', nis);
+                localStorage.setItem('nis_timestamp', Date.now().toString());
+                window.location.href = `/estado-de-cuenta?nis=${nis}`;
+            }
+        } catch (e) {
+            setError('ERROR DE CONEXIÓN');
+        }
+
+        setCargando(false);
     };
+    
+    
 
     const cambiarCampo = (campo) => {
         setCampoActivo(campo);
@@ -135,8 +149,14 @@ export default function TASLoginTerminal() {
             <div className='fixed inset-0 bg-gradient-to-br from-green-900 via-green-800 to-lime-700 flex items-center justify-center'>
                 <div className='text-center text-white animate-pulse'>
                     <div className='mb-6'>
-                        <div className='w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4'>
-                            <span className='text-4xl text-green-800'>🏦</span>
+                        <div className='w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4'>
+                            <span className='text-6xl text-green-800'>
+                                <img
+                                    src='/LOGO.png'
+                                    alt='Pantalla suspendida'
+                                    className='w-full h-full object-cover'
+                                />
+                            </span>
                         </div>
                     </div>
                     <h1 className='text-4xl font-bold mb-2'>BIENVENIDO</h1>
@@ -156,9 +176,11 @@ export default function TASLoginTerminal() {
             <div className='bg-gradient-to-r from-green-800 to-lime-600 p-6 shadow-lg'>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-4'>
-                        <div className='w-12 h-12 bg-white rounded-full flex items-center justify-center'>
-                            <span className='text-2xl text-green-800'>🏦</span>
-                        </div>
+                        <img
+                            src='/LOGO.png'
+                            alt='Pantalla suspendida'
+                            className='max-full h-full object-cover'
+                        />
                     </div>
                     <div className='text-center'>
                         <h1 className='text-2xl font-bold'>
@@ -255,7 +277,7 @@ export default function TASLoginTerminal() {
                 </div>
 
                 {/* TECLADO */}
-                <div className='w-1/2 p-8 bg-green-800/30'>
+                <div className='w-1/2 p-26 bg-green-800/30'>
                     <div className='max-w-md mx-auto'>
                         <h3 className='text-2xl font-bold mb-6 text-center'>
                             TECLADO NUMÉRICO
