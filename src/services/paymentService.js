@@ -123,12 +123,6 @@ const showModoQR = (data) => {
               alt="QR MODO" 
               style="display: block; margin: 0 auto; border: 4px solid #059669; border-radius: 15px; box-shadow: 0 8px 25px rgba(5, 150, 105, 0.3);" 
             />
-            <p style="margin-top:20px;font-size:14px;text-align:center; color: #666;">
-              <b>ID de transacción:</b><br>
-              <code style="background: #f0f0f0; padding: 8px; border-radius: 5px; font-size: 12px;">${
-                  data.externalIntentionId
-              }</code>
-            </p>
             <p style="margin-top:10px;font-size:16px;text-align:center; color: #059669; font-weight: bold;">
               ⏱️ Esperando confirmación...
             </p>

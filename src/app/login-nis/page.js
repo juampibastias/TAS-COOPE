@@ -321,12 +321,6 @@ export default function LoginNISPage() {
             <div className='bg-gradient-to-r from-green-800 to-lime-600 p-6 shadow-lg'>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-4'>
-                        <button
-                            onClick={volverAlHome}
-                            className='bg-red-600 hover:bg-red-500 px-4 py-2 rounded-lg text-white font-bold transition-colors text-sm flex items-center gap-2'
-                        >
-                            ← VOLVER
-                        </button>
                         <img
                             src='/LOGO.png'
                             alt='Logo Cooperativa'
@@ -424,6 +418,21 @@ export default function LoginNISPage() {
                                 </div>
                             </div>
                         )}
+
+                        {/* DEBUG INFO - TEMPORAL */}
+                        {/* {(nis || socio) && (
+                            <div className='mb-6 p-4 bg-blue-600/20 border-2 border-blue-500 rounded-xl'>
+                                <div className='text-sm text-blue-200'>
+                                    <div>Suministro ingresado: "{nis}"</div>
+                                    <div>Socio ingresado: "{socio}"</div>
+                                    <div>
+                                        NIS completo que se enviará: "
+                                        {parseInt(nis || '0')}
+                                        {(socio || '').padStart(6, '0')}"
+                                    </div>
+                                </div>
+                            </div>
+                        )} */}
                     </div>
                 </div>
 
@@ -490,6 +499,12 @@ export default function LoginNISPage() {
 
             {/* FOOTER */}
             <div className='bg-green-900 p-4 text-center text-green-200 text-sm'>
+                <button
+                    onClick={volverAlHome}
+                    className='bg-red-600 hover:bg-red-500 px-4 py-2 rounded-lg text-white font-bold transition-colors text-sm flex items-center gap-2'
+                >
+                    ← VOLVER
+                </button>
                 <div className='flex justify-between items-center max-w-6xl mx-auto'>
                     <span>🔒 Conexión segura</span>
                     <span>Presione ESC para volver al menú principal</span>
