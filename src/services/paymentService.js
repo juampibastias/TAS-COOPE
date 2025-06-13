@@ -47,31 +47,87 @@ const showSuccessAlert = (title, text) => {
     });
 };
 
-// Función para mostrar el selector de método de pago
+// Función para generar QR EMV interoperable
+const generateInteroperableQR = async (paymentData, nis) => {
+    const factura = paymentData.factura;
+    const amount = parseInt(paymentData.importe);
+    const vencimientoFecha = paymentData.fecha;
+
+    const emvPayload = {
+        merchant_account_information: {
+            '02': process.env.NEXT_PUBLIC_MERCHANT_ID || 'COOPE_POPULAR',
+            '03': factura.toString(),
+        },
+        merchant_category_code: '4814',
+        transaction_currency: '032',
+        transaction_amount: amount.toString(),
+        country_code: 'AR',
+        merchant_name: 'COOPERATIVA POPULAR',
+        merchant_city: 'RIVADAVIA',
+        50: process.env.NEXT_PUBLIC_MERCHANT_CUIT || '30123456789',
+        additional_data_field_template: {
+            bill_number: factura.toString(),
+            customer_id: nis,
+            due_date: vencimientoFecha,
+        },
+    };
+
+    const response = await fetch(`${baseUrl}/api/emv-qr/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emvPayload),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+            `Error ${response.status}: ${
+                errorData.message || response.statusText
+            }`
+        );
+    }
+
+    return await response.json();
+};
+
+// Función para mostrar el selector de método de pago (ACTUALIZADA)
 const showPaymentMethodSelector = async () => {
     const metodoModoHabilitado =
         process.env.NEXT_PUBLIC_MODO_ENABLED === 'true';
     const metodoMPHabilitado =
         process.env.NEXT_PUBLIC_MERCADOPAGO_ENABLED === 'true';
+    const qrEMVHabilitado = process.env.NEXT_PUBLIC_EMV_QR_ENABLED === 'true';
 
     const { value: metodoPago } = await Swal.fire({
         title: 'Selecciona un método de pago',
         html: `
           <div style="text-align: left; font-size: 18px;">
+            ${
+                qrEMVHabilitado
+                    ? `
+            <label style="color: #059669; font-weight: bold; display: block; margin-bottom: 15px; padding: 15px; border: 3px solid #059669; border-radius: 8px; cursor: pointer; background: linear-gradient(135deg, rgba(5, 150, 105, 0.1), rgba(120, 188, 27, 0.1));">
+              <input type="radio" name="metodoPago" value="emv_interoperable" style="margin-right: 10px; transform: scale(1.3);">
+              🔗 QR INTEROPERABLE
+              <br><small style="color: #666; margin-left: 25px;">✅ Compatible con MODO, MercadoPago y bancos</small>
+            </label>`
+                    : ''
+            }
+            
             <label style="${
                 metodoMPHabilitado
-                    ? 'color: #059669; font-weight: bold;'
+                    ? 'color: #0066cc; font-weight: bold;'
                     : 'color: grey;'
             }; display: block; margin-bottom: 15px; padding: 15px; border: 2px solid ${
-            metodoMPHabilitado ? '#059669' : '#ccc'
+            metodoMPHabilitado ? '#0066cc' : '#ccc'
         }; border-radius: 8px; cursor: ${
             metodoMPHabilitado ? 'pointer' : 'not-allowed'
         };">
               <input type="radio" name="metodoPago" value="mercadopago" ${
                   metodoMPHabilitado ? '' : 'disabled'
               } style="margin-right: 10px; transform: scale(1.3);">
-              💳 MercadoPago
+              💳 Solo MercadoPago
             </label>
+            
             <label style="${
                 metodoModoHabilitado
                     ? 'color: #059669; font-weight: bold;'
@@ -84,7 +140,7 @@ const showPaymentMethodSelector = async () => {
               <input type="radio" name="metodoPago" value="modo" ${
                   metodoModoHabilitado ? '' : 'disabled'
               } style="margin-right: 10px; transform: scale(1.3);">
-              📱 MODO ${metodoModoHabilitado ? '' : '(Próximamente)'}
+              📱 Solo MODO ${metodoModoHabilitado ? '' : '(Próximamente)'}
             </label>
           </div>
         `,
@@ -93,7 +149,7 @@ const showPaymentMethodSelector = async () => {
         cancelButtonText: 'Cancelar',
         confirmButtonColor: '#059669',
         cancelButtonColor: '#dc2626',
-        width: 500,
+        width: 600,
         preConfirm: () => {
             const selected = document.querySelector(
                 'input[name="metodoPago"]:checked'
@@ -133,6 +189,48 @@ const showModoQR = (data) => {
         cancelButtonText: 'Cancelar',
         cancelButtonColor: '#dc2626',
         width: 500,
+        allowOutsideClick: false,
+    });
+};
+
+// Función para mostrar QR EMV Interoperable
+const showEMVQR = (data) => {
+    Swal.fire({
+        html: `
+          <div style="text-align: center;">
+            <h3 style="color: #059669; margin-bottom: 20px; font-size: 22px;">
+              🔗 QR INTEROPERABLE EMV
+            </h3>
+            <p style="margin-bottom: 20px; font-size: 16px; color: #333;">
+              Escaneá con <strong>cualquier billetera digital</strong>
+            </p>
+            <img 
+              src="${data.qr_url}" 
+              alt="QR Interoperable EMV" 
+              style="border: 4px solid #059669; border-radius: 15px; box-shadow: 0 8px 25px rgba(5, 150, 105, 0.3); margin-bottom: 20px;" 
+            />
+            <div style="display: flex; justify-content: space-around; margin-bottom: 15px; font-size: 16px;">
+              <span>📱 MODO</span>
+              <span>💳 MercadoPago</span>
+              <span>🏦 Bancos</span>
+              <span>🔗 Otras</span>
+            </div>
+            <div style="background: #f0f9ff; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+              <p style="font-size: 12px; color: #666; margin: 0;">
+                <strong>Estándar EMV QR Code</strong><br>
+                Compatible con normativa BCRA Argentina
+              </p>
+            </div>
+            <p style="margin-top: 15px; color: #059669; font-weight: bold; font-size: 16px;">
+              ⏱️ Esperando confirmación de pago...
+            </p>
+          </div>
+        `,
+        showConfirmButton: false,
+        showCancelButton: true,
+        cancelButtonText: 'Cancelar',
+        cancelButtonColor: '#dc2626',
+        width: 550,
         allowOutsideClick: false,
     });
 };
@@ -205,7 +303,52 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
     return await response.json();
 };
 
-// Función principal para procesar pagos
+// Función de polling universal para QR EMV (simplificada para testing)
+const startUniversalPolling = (factura, nis) => {
+    console.log(
+        `🔄 Iniciando polling universal para factura: ${factura}, NIS: ${nis}`
+    );
+
+    // Polling simplificado para testing - en producción esto verificaría tu backend
+    const pollInterval = setInterval(async () => {
+        try {
+            // En producción, verificar estado en tu backend
+            const response = await fetch(
+                `${baseUrl}/api/payment-status/${factura}/${nis}`
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+
+                if (data.status === 'approved') {
+                    clearInterval(pollInterval);
+                    Swal.close();
+                    await showSuccessAlert(
+                        '¡Pago confirmado!',
+                        `Pagado exitosamente con ${
+                            data.wallet_source || 'billetera digital'
+                        }`
+                    );
+                    window.location.reload();
+                }
+            }
+        } catch (error) {
+            console.error('Error en polling universal:', error);
+        }
+    }, 3000);
+
+    // Timeout después de 5 minutos
+    setTimeout(() => {
+        clearInterval(pollInterval);
+        Swal.close();
+        showErrorAlert(
+            'Tiempo agotado',
+            'El QR ha expirado. Intente nuevamente.'
+        );
+    }, 300000);
+};
+
+// Función principal para procesar pagos (CORREGIDA)
 export const processPayment = async (paymentData, nis) => {
     try {
         // Paso 1: Validación inicial
@@ -228,37 +371,63 @@ export const processPayment = async (paymentData, nis) => {
         const metodoPago = await showPaymentMethodSelector();
         if (!metodoPago) return;
 
-        // Paso 3: Procesar pago
-        showLoadingAlert(
-            'Procesando pago...',
-            `Conectando con ${
-                metodoPago === 'mercadopago' ? 'MercadoPago' : 'MODO'
-            }`
-        );
+        // Paso 3: Procesar según el método seleccionado
+        if (metodoPago === 'emv_interoperable') {
+            // QR EMV Interoperable
+            showLoadingAlert(
+                'Generando QR interoperable...',
+                'Compatible con todas las billeteras digitales'
+            );
 
-        const response = await submitPayment(paymentData, nis, metodoPago);
+            const response = await generateInteroperableQR(paymentData, nis);
 
-        // Paso 4: Manejar respuesta según el método
-        if (metodoPago === 'mercadopago') {
-            // Redirigir a MercadoPago
-            if (response.init_point) {
-                window.location.href = response.init_point;
-            } else {
-                throw new Error(
-                    'No se recibió el enlace de pago de MercadoPago'
+            if (!response.qr_code) {
+                throw new Error('Error generando QR interoperable');
+            }
+
+            // Mostrar QR EMV
+            showEMVQR(response);
+
+            // Iniciar polling universal
+            startUniversalPolling(paymentData.factura, nis);
+        } else {
+            // Métodos tradicionales (MODO o MercadoPago)
+            showLoadingAlert(
+                'Procesando pago...',
+                `Conectando con ${
+                    metodoPago === 'mercadopago' ? 'MercadoPago' : 'MODO'
+                }`
+            );
+
+            const response = await submitPayment(paymentData, nis, metodoPago);
+
+            // Manejar respuesta según el método
+            if (metodoPago === 'mercadopago') {
+                // Redirigir a MercadoPago
+                if (response.init_point) {
+                    window.location.href = response.init_point;
+                } else {
+                    throw new Error(
+                        'No se recibió el enlace de pago de MercadoPago'
+                    );
+                }
+            } else if (metodoPago === 'modo') {
+                // Mostrar QR MODO y empezar polling
+                if (!response.qr) {
+                    throw new Error('El QR no fue generado correctamente.');
+                }
+
+                showModoQR(response);
+
+                // Iniciar polling para MODO
+                const isSecondVencimiento = paymentData.vencimiento !== '1';
+                startPolling(
+                    paymentData.factura,
+                    nis,
+                    null,
+                    isSecondVencimiento
                 );
             }
-        } else if (metodoPago === 'modo') {
-            // Mostrar QR y empezar polling
-            if (!response.qr) {
-                throw new Error('El QR no fue generado correctamente.');
-            }
-
-            showModoQR(response);
-
-            // Iniciar polling para MODO
-            const isSecondVencimiento = paymentData.vencimiento !== '1';
-            startPolling(paymentData.factura, nis, null, isSecondVencimiento);
         }
     } catch (error) {
         console.error('❌ Error al procesar el pago:', error);
@@ -277,4 +446,5 @@ export {
     showSuccessAlert,
     showPaymentMethodSelector,
     showModoQR,
+    generateInteroperableQR,
 };
