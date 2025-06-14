@@ -69,11 +69,11 @@ export async function GET(request) {
             country_code: 'AR',
             merchant_name: 'COOPERATIVA POPULAR',
             merchant_city: 'RIVADAVIA',
-            50: '30123456789',
+            50: '30545717235',
             additional_data_field_template: {
                 bill_number: 'TEST_123',
                 customer_id: '7000001',
-                due_date: '20/03/2025',
+                due_date: '20/06/2025',
             },
         };
 

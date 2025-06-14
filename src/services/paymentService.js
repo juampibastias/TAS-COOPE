@@ -90,7 +90,7 @@ const generateInteroperableQR = async (paymentData, nis) => {
     return await response.json();
 };
 
-// Función para mostrar el selector de método de pago (ACTUALIZADA)
+// Función para mostrar el selector de método de pago
 const showPaymentMethodSelector = async () => {
     const metodoModoHabilitado =
         process.env.NEXT_PUBLIC_MODO_ENABLED === 'true';
@@ -309,10 +309,9 @@ const startUniversalPolling = (factura, nis) => {
         `🔄 Iniciando polling universal para factura: ${factura}, NIS: ${nis}`
     );
 
-    // Polling simplificado para testing - en producción esto verificaría tu backend
+    // Polling simplificado para testing
     const pollInterval = setInterval(async () => {
         try {
-            // En producción, verificar estado en tu backend
             const response = await fetch(
                 `${baseUrl}/api/payment-status/${factura}/${nis}`
             );
@@ -348,7 +347,7 @@ const startUniversalPolling = (factura, nis) => {
     }, 300000);
 };
 
-// Función principal para procesar pagos (CORREGIDA)
+// Función principal para procesar pagos
 export const processPayment = async (paymentData, nis) => {
     try {
         // Paso 1: Validación inicial
