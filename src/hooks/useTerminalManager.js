@@ -25,6 +25,7 @@ export const useTerminalManager = () => {
     const [connectionFailures, setConnectionFailures] = useState(0);
 
     const initializingRef = useRef(false);
+    const registerAttemptedRef = useRef(false);
     const heartbeatIntervalRef = useRef(null);
     const isInitializedRef = useRef(false);
     const heartbeatStartedRef = useRef(false);
@@ -33,25 +34,27 @@ export const useTerminalManager = () => {
     const TERMINAL_ENABLED =
         process.env.NEXT_PUBLIC_TERMINAL_ENABLED === 'true';
 
-    // Inicialización del terminal
     useEffect(() => {
         if (!TERMINAL_ENABLED || isInitializedRef.current) return;
 
         const initializeTerminal = async () => {
-            if (initializingRef.current) return;
+            if (initializingRef.current || registerAttemptedRef.current) return;
+
             initializingRef.current = true;
             isInitializedRef.current = true;
+            registerAttemptedRef.current = true;
 
             try {
                 console.log('🔍 Inicializando terminal...');
                 let config = getTerminalConfig();
 
-                // Si no hay configuración, generar una nueva
                 if (!config?.id) {
                     const deviceId = await generateDeviceFingerprint();
                     config = {
                         id: deviceId,
-                        name: `Terminal ${deviceId.substring(-4)}`,
+                        name: `Terminal ${deviceId.substring(
+                            deviceId.length - 4
+                        )}`,
                         location: 'Sin configurar',
                         url: window.location.origin,
                         type: 'KIOSK',
@@ -63,13 +66,10 @@ export const useTerminalManager = () => {
 
                 setTerminalConfig(config);
                 setIsConfigured(isTerminalConfigured());
-                setStatus('connecting');
-
-                // Registrar terminal en el backend
-                await registerTerminal(config);
                 setStatus('online');
-                setConnectionFailures(0);
 
+                await registerTerminal(config);
+                setConnectionFailures(0);
                 console.log('✅ Terminal inicializado:', config.id);
             } catch (error) {
                 console.error('❌ Error inicializando terminal:', error);
@@ -81,7 +81,6 @@ export const useTerminalManager = () => {
         initializeTerminal();
     }, []);
 
-    // Registro del terminal en el backend
     const registerTerminal = useCallback(async (config) => {
         if (!TERMINAL_ENABLED) return;
 
@@ -127,16 +126,92 @@ export const useTerminalManager = () => {
 
             const result = await response.json();
             console.log('✅ Terminal registrado:', result);
-
             return result;
         } catch (error) {
             console.error('❌ Error en registro:', error);
-            setStatus('connection_error');
+            setStatus('online');
             throw error;
         }
     }, []);
 
-    // Sistema de heartbeat
+    const sendHeartbeat = useCallback(async () => {
+        if (!terminalConfig?.id) {
+            console.warn(
+                '❌ No se encontró terminalConfig.id, abortando heartbeat'
+            );
+            return;
+        }
+
+        try {
+            const hardwareInfo = await getHardwareInfo();
+
+            // Normalizamos el estado permitido por el backend
+            let heartbeatStatus = ['online', 'offline', 'maintenance'].includes(
+                status
+            )
+                ? status
+                : 'maintenance';
+
+            const heartbeatData = {
+                status: heartbeatStatus,
+                version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+                timestamp: new Date().toISOString(),
+                hardware: hardwareInfo,
+                failures: connectionFailures,
+                uptime:
+                    Date.now() -
+                    (terminalConfig.createdAt
+                        ? new Date(terminalConfig.createdAt).getTime()
+                        : Date.now()),
+                currentUrl: window.location.href,
+            };
+
+            const response = await fetch(
+                `${BACKEND_URL}/terminalsApi/${terminalConfig.id}/heartbeat`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${TERMINAL_TOKEN}`,
+                    },
+                    body: JSON.stringify(heartbeatData),
+                }
+            );
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            setLastHeartbeat(new Date());
+            setConnectionFailures(0);
+
+            if (data.command && data.commandId !== lastCommandIdRef.current) {
+                lastCommandIdRef.current = data.commandId;
+                await executeCommand(data.command, data.commandId);
+            }
+
+            if (data.config) {
+                setTerminalConfig((prev) => {
+                    const updated = { ...prev, ...data.config };
+                    saveTerminalConfig(updated);
+                    return updated;
+                });
+            }
+
+            if (status === 'offline') {
+                setStatus('online');
+            }
+        } catch (err) {
+            console.error('💔 Heartbeat error:', err);
+            setConnectionFailures((prev) => {
+                const newVal = prev + 1;
+                if (newVal >= MAX_FAILURES && status !== 'offline') {
+                    setStatus('offline');
+                }
+                return newVal;
+            });
+        }
+    }, [terminalConfig?.id, status, connectionFailures]);
+
     useEffect(() => {
         if (
             !TERMINAL_ENABLED ||
@@ -144,112 +219,28 @@ export const useTerminalManager = () => {
             status === 'initializing' ||
             status === 'error' ||
             status === 'shutdown'
-        ) {
+        )
             return;
-        }
 
-        if (heartbeatStartedRef.current) {
-            return;
-        }
+        if (heartbeatStartedRef.current) return;
 
         heartbeatStartedRef.current = true;
-        console.log('💓 Iniciando heartbeat para:', terminalConfig.id);
 
-        const sendHeartbeat = async () => {
-            try {
-                const hardwareInfo = await getHardwareInfo();
-
-                const heartbeatData = {
-                    status,
-                    version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
-                    timestamp: new Date().toISOString(),
-                    hardware: hardwareInfo,
-                    failures: connectionFailures,
-                    uptime:
-                        Date.now() -
-                        (terminalConfig.createdAt
-                            ? new Date(terminalConfig.createdAt).getTime()
-                            : Date.now()),
-                    currentUrl: window.location.href,
-                };
-
-                /* const response = await fetch(
-                    `${BACKEND_URL}/terminalsApi/${terminalConfig.id}/heartbeat`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${TERMINAL_TOKEN}`,
-                        },
-                        body: JSON.stringify(heartbeatData),
-                    }
-                ); */
-
-                if (!response.ok) {
-                    throw new Error(
-                        `HTTP ${response.status}: ${response.statusText}`
-                    );
-                }
-
-                const data = await response.json();
-                setLastHeartbeat(new Date());
-                setConnectionFailures(0);
-
-                // Procesar comandos recibidos
-                if (
-                    data.command &&
-                    data.commandId !== lastCommandIdRef.current
-                ) {
-                    console.log('📨 Comando recibido:', data.command);
-                    lastCommandIdRef.current = data.commandId;
-                    await executeCommand(data.command, data.commandId);
-                }
-
-                // Actualizar configuración si viene del servidor
-                if (data.config) {
-                    setTerminalConfig((prev) => {
-                        const updatedConfig = { ...prev, ...data.config };
-                        saveTerminalConfig(updatedConfig);
-                        return updatedConfig;
-                    });
-                }
-
-                if (status === 'connection_error') {
-                    setStatus('online');
-                }
-            } catch (error) {
-                console.error('💔 Error en heartbeat:', error);
-                setConnectionFailures((prev) => {
-                    const newFailures = prev + 1;
-
-                    if (newFailures >= MAX_FAILURES) {
-                        setStatus('connection_error');
-                    }
-
-                    return newFailures;
-                });
-            }
-        };
-
-        // Enviar heartbeat inmediatamente
-        sendHeartbeat();
-
-        // Configurar intervalo
         heartbeatIntervalRef.current = setInterval(
             sendHeartbeat,
             HEARTBEAT_INTERVAL
         );
+        setTimeout(() => {
+            sendHeartbeat();
+        }, 500);
 
         return () => {
-            if (heartbeatIntervalRef.current) {
-                clearInterval(heartbeatIntervalRef.current);
-                heartbeatIntervalRef.current = null;
-            }
+            clearInterval(heartbeatIntervalRef.current);
+            heartbeatIntervalRef.current = null;
             heartbeatStartedRef.current = false;
         };
-    }, [TERMINAL_ENABLED, terminalConfig?.id, status, connectionFailures]);
+    }, [TERMINAL_ENABLED, terminalConfig?.id, status, sendHeartbeat]);
 
-    // Ejecución de comandos remotos
     const executeCommand = useCallback(
         async (command, commandId) => {
             let success = true;
@@ -281,7 +272,6 @@ export const useTerminalManager = () => {
                         break;
 
                     case 'hard_refresh':
-                        // Limpiar caches y datos
                         if ('caches' in window) {
                             const cacheNames = await caches.keys();
                             await Promise.all(
@@ -356,7 +346,6 @@ export const useTerminalManager = () => {
                 console.error(`❌ Error ejecutando comando ${command}:`, error);
             }
 
-            // Confirmar ejecución del comando al servidor
             if (
                 TERMINAL_ENABLED &&
                 command !== 'force_reload' &&
@@ -389,119 +378,41 @@ export const useTerminalManager = () => {
         [terminalConfig?.id, status, connectionFailures, lastHeartbeat]
     );
 
-    // Pantallas de estado
     const showRebootScreen = () => {
         document.body.innerHTML = `
-            <div style="position: fixed; inset: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                display: flex; align-items: center; justify-content: center; font-family: Arial, sans-serif; 
-                color: white; text-align: center; z-index: 9999;">
+            <div style="position: fixed; inset: 0; background: #000; color: white; display: flex; align-items: center; justify-content: center; font-family: sans-serif;">
                 <div>
-                    <div style="font-size: 4rem; margin-bottom: 2rem; animation: spin 2s linear infinite;">🔄</div>
-                    <h1 style="font-size: 3rem; margin-bottom: 1rem;">Reiniciando Terminal</h1>
-                    <p style="font-size: 1.5rem; margin-bottom: 2rem;">Por favor espere...</p>
-                    <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 10px; margin: 0 auto; max-width: 400px;">
-                        <p style="margin: 0;"><strong>Terminal ID:</strong> ${terminalConfig?.id}</p>
-                        <p style="margin: 0.5rem 0 0 0;"><strong>Tiempo estimado:</strong> 10-30 segundos</p>
-                    </div>
+                    <h1>Reiniciando Terminal...</h1>
                 </div>
-                <style>
-                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                </style>
-            </div>
-        `;
+            </div>`;
     };
 
     const showOfflineScreen = () => {
         document.body.innerHTML = `
-            <div style="position: fixed; inset: 0; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-                display: flex; align-items: center; justify-content: center; font-family: Arial, sans-serif; 
-                color: white; text-align: center; z-index: 9999;">
+            <div style="position: fixed; inset: 0; background: #900; color: white; display: flex; align-items: center; justify-content: center; font-family: sans-serif;">
                 <div>
-                    <div style="font-size: 4rem; margin-bottom: 2rem;">📡❌</div>
-                    <h1 style="font-size: 3rem; margin-bottom: 1rem;">Sin Conexión</h1>
-                    <p style="font-size: 1.5rem; margin-bottom: 2rem;">
-                        La terminal ha perdido conexión con el servidor.<br>
-                        Contacte al personal técnico.
-                    </p>
-                    <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 10px; margin: 0 auto; max-width: 400px;">
-                        <p style="margin: 0;"><strong>Terminal ID:</strong> ${
-                            terminalConfig?.id
-                        }</p>
-                        <p style="margin: 0.5rem 0 0 0;"><strong>Última conexión:</strong> ${new Date().toLocaleString()}</p>
-                        <p style="margin: 0.5rem 0 0 0;"><strong>Fallos:</strong> ${connectionFailures}/${MAX_FAILURES}</p>
-                    </div>
+                    <h1>Sin conexión</h1>
                 </div>
-            </div>
-        `;
+            </div>`;
     };
 
-    // Actualizar configuración
     const updateConfig = useCallback(
         (newConfig) => {
             setTerminalConfig((prev) => {
-                const updatedConfig = {
+                const updated = {
                     ...prev,
                     ...newConfig,
                     updatedAt: new Date().toISOString(),
                 };
-                saveTerminalConfig(updatedConfig);
+                saveTerminalConfig(updated);
                 setIsConfigured(isTerminalConfigured());
                 setShowSetup(false);
-
-                // Re-registrar con nueva configuración
-                registerTerminal(updatedConfig).catch(console.error);
-
-                return updatedConfig;
+                registerTerminal(updated).catch(console.error);
+                return updated;
             });
         },
         [registerTerminal]
     );
-
-    // Atajos de teclado globales
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            // Ctrl+Alt+Shift+C - Mostrar configuración
-            if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'C') {
-                e.preventDefault();
-                setShowSetup(true);
-            }
-
-            // Ctrl+Alt+Shift+R - Reset terminal
-            if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'R') {
-                e.preventDefault();
-                if (
-                    confirm(
-                        '🚨 ¿RESETEAR TERMINAL?\n\nEsto borrará todos los datos y reiniciará la terminal.'
-                    )
-                ) {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    window.location.reload();
-                }
-            }
-
-            // Ctrl+Alt+Shift+I - Mostrar información
-            if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'I') {
-                e.preventDefault();
-                console.log('📊 Información del terminal:', {
-                    config: terminalConfig,
-                    status,
-                    failures: connectionFailures,
-                    lastHeartbeat,
-                    isConfigured,
-                });
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [
-        terminalConfig,
-        status,
-        connectionFailures,
-        lastHeartbeat,
-        isConfigured,
-    ]);
 
     return {
         terminalConfig,

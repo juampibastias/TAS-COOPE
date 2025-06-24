@@ -1,14 +1,9 @@
-// Opción 1: Con next-pwa (si funciona)
-// import withPWA from 'next-pwa';
-
-// Opción 2: Sin dependencias externas (más simple para empezar)
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // Mantener tu configuración actual
-    output: 'export', // Para generar archivos estáticos
+    // Para PWA no usar export estático
     trailingSlash: true,
     images: {
-        unoptimized: true, // Para terminales sin optimización de imágenes
+        unoptimized: true,
     },
 
     // Headers para PWA
@@ -40,21 +35,22 @@ const nextConfig = {
                     },
                 ],
             },
+            {
+                source: '/LOGO.png',
+                headers: [
+                    {
+                        key: 'Cache-Control',
+                        value: 'public, max-age=31536000, immutable',
+                    },
+                ],
+            },
         ];
     },
+
+    // Remover la configuración experimental que causa el error
+    // experimental: {
+    //     optimizeCss: true,
+    // },
 };
 
-// Si next-pwa funciona, descomenta estas líneas:
-/*
-  const withPWAConfig = withPWA({
-    dest: 'public',
-    register: true,
-    skipWaiting: true,
-    disable: process.env.NODE_ENV === 'development',
-  });
-  
-  export default withPWAConfig(nextConfig);
-  */
-
-// Por ahora, usar configuración simple:
 export default nextConfig;

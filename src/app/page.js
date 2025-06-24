@@ -1,12 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useTerminalInstallation } from '../hooks/useTerminalInstallations';
+import { useTerminalInstallation } from '../hooks/useTerminalInstallation';
 
 export default function TASHomeScreen() {
     const [modoSuspendido, setModoSuspendido] = useState(true);
     const [mostrarBienvenida, setMostrarBienvenida] = useState(false);
 
-    // 🆕 Hook de instalación PWA
+    // Hook PWA simplificado
     const {
         isInstalled,
         canInstall,
@@ -25,7 +25,7 @@ export default function TASHomeScreen() {
             clearTimeout(inactividadTimer);
             inactividadTimer = setTimeout(() => {
                 setModoSuspendido(true);
-            }, 5 * 60 * 1000); // 5 minutos
+            }, 5 * 60 * 1000);
         };
 
         const handleUserInteraction = () => {
@@ -36,7 +36,6 @@ export default function TASHomeScreen() {
             resetInactividad();
         };
 
-        // Eventos de interacción
         window.addEventListener('mousedown', handleUserInteraction);
         window.addEventListener('touchstart', handleUserInteraction);
         window.addEventListener('keydown', handleUserInteraction);
@@ -56,24 +55,12 @@ export default function TASHomeScreen() {
         if (mostrarBienvenida) {
             const timer = setTimeout(() => {
                 setMostrarBienvenida(false);
-            }, 3000); // 3 segundos
+            }, 3000);
             return () => clearTimeout(timer);
         }
     }, [mostrarBienvenida]);
 
-    // 🆕 Mostrar notificación de instalación si es necesario
-    useEffect(() => {
-        if (
-            installStep === 'installable' &&
-            !modoSuspendido &&
-            !mostrarBienvenida
-        ) {
-            // Mostrar notificación sutil de instalación disponible
-            console.log('💾 Terminal PWA instalable detectada');
-        }
-    }, [installStep, modoSuspendido, mostrarBienvenida]);
-
-    // Navegación a las diferentes funciones
+    // Navegación
     const irAPagarFactura = () => {
         window.location.href = '/login-nis';
     };
@@ -82,7 +69,7 @@ export default function TASHomeScreen() {
         window.location.href = '/imprimir-formularios';
     };
 
-    // 🆕 Función para instalar PWA
+    // Función para instalar PWA
     const handleInstallPWA = async () => {
         const success = await installApp();
         if (success) {
@@ -90,7 +77,7 @@ export default function TASHomeScreen() {
         }
     };
 
-    // Pantalla suspendida (screensaver)
+    // Pantalla suspendida
     if (modoSuspendido) {
         return (
             <div className='fixed inset-0 bg-black flex items-center justify-center z-50'>
@@ -99,7 +86,6 @@ export default function TASHomeScreen() {
                     alt='Pantalla suspendida'
                     className='w-full h-full object-cover'
                 />
-                {/* 🆕 Indicador de terminal PWA en modo suspendido */}
                 {isInstalled && terminalId && (
                     <div className='absolute bottom-4 right-4 bg-black bg-opacity-70 text-green-400 px-3 py-2 rounded-lg text-sm font-mono'>
                         Terminal: {terminalId.slice(-8)}
@@ -109,7 +95,7 @@ export default function TASHomeScreen() {
         );
     }
 
-    // Pantalla de bienvenida temporal
+    // Pantalla de bienvenida
     if (mostrarBienvenida) {
         return (
             <div className='fixed inset-0 bg-gradient-to-br from-green-900 via-green-800 to-lime-700 flex items-center justify-center'>
@@ -128,7 +114,7 @@ export default function TASHomeScreen() {
                     <p className='text-lg text-green-200'>
                         Cooperativa Popular
                     </p>
-                    {/* 🆕 Mostrar info de terminal si está instalado */}
+
                     {isInstalled && terminalId && (
                         <div className='mt-4 bg-green-800 bg-opacity-50 rounded-lg p-3'>
                             <p className='text-sm text-green-200'>
@@ -139,6 +125,7 @@ export default function TASHomeScreen() {
                             </p>
                         </div>
                     )}
+
                     <div className='mt-8'>
                         <div className='inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-white'></div>
                     </div>
@@ -147,7 +134,7 @@ export default function TASHomeScreen() {
         );
     }
 
-    // ✅ Pantalla principal - Menú de opciones tipo cajero
+    // Pantalla principal
     return (
         <div className='fixed inset-0 bg-gradient-to-br from-green-900 via-green-800 to-lime-700 text-white flex flex-col'>
             {/* HEADER */}
@@ -159,7 +146,6 @@ export default function TASHomeScreen() {
                             alt='Logo Cooperativa'
                             className='h-16 w-auto object-contain'
                         />
-                        {/* 🆕 Indicador de estado de terminal */}
                         {isTerminalMode && (
                             <div className='flex flex-col text-xs'>
                                 <span
@@ -202,11 +188,10 @@ export default function TASHomeScreen() {
                                 minute: '2-digit',
                             })}
                         </div>
-                        {/* 🆕 Botón de instalación PWA */}
                         {canInstall && (
                             <button
                                 onClick={handleInstallPWA}
-                                className='mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold transition-colors'
+                                className='mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold transition-colors animate-pulse'
                                 title='Instalar como aplicación'
                             >
                                 📱 INSTALAR
@@ -228,25 +213,39 @@ export default function TASHomeScreen() {
                             Seleccione una opción tocando el botón
                             correspondiente
                         </p>
-                        {/* 🆕 Sugerencia de instalación si no está instalado */}
+
                         {!isInstalled && canInstall && (
-                            <div className='mt-4 bg-blue-900 bg-opacity-50 rounded-lg p-3 max-w-md mx-auto'>
+                            <div className='mt-4 bg-blue-900 bg-opacity-50 rounded-lg p-3 max-w-md mx-auto border border-blue-400'>
                                 <p className='text-blue-200 text-sm'>
-                                    💡 <strong>Tip:</strong> Instale esta
-                                    terminal como aplicación para mejor
-                                    rendimiento
+                                    💡 <strong>Recomendación:</strong> Instale
+                                    esta terminal como aplicación
+                                </p>
+                                <p className='text-blue-300 text-xs mb-3'>
+                                    ✨ Mejor rendimiento • 📱 Acceso directo •
+                                    🚀 Carga más rápida
                                 </p>
                                 <button
                                     onClick={handleInstallPWA}
-                                    className='mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-bold transition-colors'
+                                    className='px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-bold transition-colors'
                                 >
                                     📱 Instalar Terminal PWA
                                 </button>
                             </div>
                         )}
+
+                        {isInstalled && (
+                            <div className='mt-4 bg-green-800 bg-opacity-30 rounded-lg p-3 max-w-md mx-auto border border-green-400'>
+                                <p className='text-green-200 text-sm'>
+                                    ✅ <strong>Terminal PWA Instalada</strong>
+                                </p>
+                                <p className='text-green-300 text-xs'>
+                                    Acceso directo • Optimizada para terminales
+                                </p>
+                            </div>
+                        )}
                     </div>
 
-                    {/* BOTONES PRINCIPALES - Tipo cajero */}
+                    {/* BOTONES PRINCIPALES */}
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto'>
                         {/* Botón Pagar Factura */}
                         <button
@@ -254,25 +253,18 @@ export default function TASHomeScreen() {
                             className='group relative bg-gradient-to-br from-green-600 to-green-700 hover:from-lime-500 hover:to-green-600 p-8 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 active:scale-95 border-4 border-green-500 hover:border-lime-400'
                         >
                             <div className='text-center'>
-                                {/* Icono */}
                                 <div className='text-8xl mb-6 group-hover:scale-110 transition-transform duration-300'>
                                     💳
                                 </div>
-
-                                {/* Título */}
                                 <h3 className='text-3xl font-bold mb-4 text-white group-hover:text-lime-100'>
                                     PAGAR FACTURA
                                 </h3>
-
-                                {/* Descripción */}
                                 <p className='text-lg text-green-100 group-hover:text-white leading-relaxed'>
                                     Consulte su estado de cuenta y<br />
                                     pague sus facturas de electricidad
                                     <br />
                                     con MercadoPago o MODO
                                 </p>
-
-                                {/* Indicador visual */}
                                 <div className='mt-6 inline-flex items-center text-lime-200 group-hover:text-white'>
                                     <span className='text-lg font-semibold'>
                                         Toque para continuar
@@ -282,8 +274,6 @@ export default function TASHomeScreen() {
                                     </span>
                                 </div>
                             </div>
-
-                            {/* Efecto de brillo */}
                             <div className='absolute inset-0 rounded-3xl bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform translate-x-full group-hover:translate-x-[-200%] transition-transform duration-1000'></div>
                         </button>
 
@@ -293,25 +283,18 @@ export default function TASHomeScreen() {
                             className='group relative bg-gradient-to-br from-blue-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 p-8 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 active:scale-95 border-4 border-blue-500 hover:border-cyan-400'
                         >
                             <div className='text-center'>
-                                {/* Icono */}
                                 <div className='text-8xl mb-6 group-hover:scale-110 transition-transform duration-300'>
                                     🖨️
                                 </div>
-
-                                {/* Título */}
                                 <h3 className='text-3xl font-bold mb-4 text-white group-hover:text-cyan-100'>
                                     IMPRIMIR FORMULARIOS
                                 </h3>
-
-                                {/* Descripción */}
                                 <p className='text-lg text-blue-100 group-hover:text-white leading-relaxed'>
                                     Imprima facturas anteriores,
                                     <br />
                                     formularios de servicios y<br />
                                     documentación oficial
                                 </p>
-
-                                {/* Indicador visual */}
                                 <div className='mt-6 inline-flex items-center text-cyan-200 group-hover:text-white'>
                                     <span className='text-lg font-semibold'>
                                         Toque para continuar
@@ -321,8 +304,6 @@ export default function TASHomeScreen() {
                                     </span>
                                 </div>
                             </div>
-
-                            {/* Efecto de brillo */}
                             <div className='absolute inset-0 rounded-3xl bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform translate-x-full group-hover:translate-x-[-200%] transition-transform duration-1000'></div>
                         </button>
                     </div>
@@ -334,20 +315,24 @@ export default function TASHomeScreen() {
                             flechas del teclado para navegar
                         </p>
 
-                        {/* 🆕 Info adicional si está instalado como PWA */}
-                        {isInstalled && (
-                            <div className='mt-4 bg-green-800 bg-opacity-30 rounded-lg p-4 max-w-md mx-auto'>
-                                <p className='text-green-200 text-sm'>
-                                    ✅ <strong>Terminal PWA Instalada</strong>
-                                    <br />
-                                    Funciona sin conexión y con mejor
-                                    rendimiento
-                                </p>
-                                <p className='text-green-300 text-xs font-mono mt-2'>
-                                    Terminal ID: {terminalId}
-                                </p>
-                            </div>
-                        )}
+                        {/* Debug info en desarrollo */}
+                        {process.env.NODE_ENV === 'development' &&
+                            terminalId && (
+                                <div className='mt-4 bg-gray-800 bg-opacity-30 rounded-lg p-3 max-w-lg mx-auto text-xs'>
+                                    <p className='text-gray-300 font-mono'>
+                                        <strong>Debug PWA:</strong>
+                                        <br />
+                                        ID: {terminalId}
+                                        <br />
+                                        Estado: {installStep}
+                                        <br />
+                                        Instalado: {isInstalled ? 'Sí' : 'No'}
+                                        <br />
+                                        Puede instalar:{' '}
+                                        {canInstall ? 'Sí' : 'No'}
+                                    </p>
+                                </div>
+                            )}
                     </div>
                 </div>
             </div>
@@ -358,7 +343,6 @@ export default function TASHomeScreen() {
                     <div className='flex items-center gap-2'>
                         <span className='text-lg'>🔒</span>
                         <span>Conexión segura</span>
-                        {/* 🆕 Indicador de modo PWA */}
                         {isInstalled && (
                             <span className='ml-4 px-2 py-1 bg-green-700 rounded text-xs'>
                                 📱 PWA
@@ -371,7 +355,6 @@ export default function TASHomeScreen() {
                     </div>
                     <div className='text-sm'>
                         Terminal de Autoservicio v1.0
-                        {/* 🆕 Mostrar ID de terminal */}
                         {terminalId && (
                             <div className='text-xs font-mono text-green-300'>
                                 {terminalId.slice(-8)}
