@@ -76,12 +76,12 @@ export default function TerminalProvider({ children }) {
             )}
 
             {/* Modal de configuración */}
-            <TerminalSetup
+            {/* <TerminalSetup
                 show={showSetup || !isConfigured}
                 onClose={() => setShowSetup(false)}
                 currentConfig={terminalConfig}
                 onSave={updateConfig}
-            />
+            /> */}
 
             {/* Contenido principal */}
             {children}
