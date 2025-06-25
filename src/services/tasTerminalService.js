@@ -484,7 +484,7 @@ class TASTerminalService {
         overlay.innerHTML = `
         <div style="text-align: center; padding: 2rem; background: rgba(0,0,0,0.1); border-radius: 20px;">
           <div style="font-size: 5rem; margin-bottom: 1rem; animation: pulse 2s infinite;">🔧</div>
-          <h1 style="font-size: 3rem; margin-bottom: 1rem; font-weight: bold;">MODO MANTENIMIENTO</h1>
+          <h1 style="font-size: 3rem; margin-bottom: 1rem; font-weight: bold;">TERMINAL EN MANTENIMIENTO</h1>
           <p style="font-size: 1.5rem; margin-bottom: 2rem;">Terminal temporalmente fuera de servicio</p>
           <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; font-family: monospace;">
             <p>Terminal ID: ${this.terminalId}</p>
