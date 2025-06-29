@@ -1,0 +1,62 @@
+{
+    "name": "TAS COOPE - Terminal Autoservicio",
+    "short_name": "TAS COOPE",
+    "description": "Terminal de autoservicio Cooperativa Popular de Electricidad",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "landscape",
+    "background_color": "#00983f",
+    "theme_color": "#00983f",
+    "categories": ["business", "productivity", "utilities"],
+    "scope": "/",
+    "lang": "es-AR",
+    "dir": "ltr",
+    "id": "/",
+    "icons": [
+        {
+            "src": "/PWA.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/PWA.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Pagar Factura",
+            "short_name": "Pagar",
+            "description": "Pagar facturas de electricidad",
+            "url": "/login-nis",
+            "icons": [
+                {
+                    "src": "/PWA.png",
+                    "sizes": "any"
+                }
+            ]
+        },
+        {
+            "name": "Imprimir Formularios",
+            "short_name": "Formularios",
+            "description": "Imprimir formularios y documentos",
+            "url": "/imprimir-formularios",
+            "icons": [
+                {
+                    "src": "/PWA.png",
+                    "sizes": "any"
+                }
+            ]
+        }
+    ],
+    "protocol_handlers": [
+        {
+            "protocol": "web+tascoope",
+            "url": "/?action=%s"
+        }
+    ],
+    "features": ["Cross Platform", "fast", "simple", "offline"]
+}
