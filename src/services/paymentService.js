@@ -47,12 +47,11 @@ const showSuccessAlert = (title, text) => {
     });
 };
 
-// ===== FUNCIÓN PARA REFRESCAR ESTADO DE FACTURAS (CORREGIDA) =====
+// ===== FUNCIÓN PARA REFRESCAR ESTADO DE FACTURAS =====
 const refreshFacturasState = async (nis) => {
     try {
         console.log('🔄 Refrescando estado de facturas para NIS:', nis);
 
-        // ✅ USAR ENDPOINT CORRECTO QUE SÍ EXISTE
         const response = await fetch(`${baseUrl}/api/facturas?nis=${nis}`, {
             method: 'GET',
             headers: {
@@ -181,9 +180,9 @@ const showModoQR = (data, onCancel = null) => {
     });
 };
 
-// ✅ QR MERCADOPAGO SIMPLE - IGUAL QUE MODO
+// ✅ QR MERCADOPAGO CON DETECCIÓN REAL DE ESCANEO
 const showMercadoPagoQR = (data, onCancel = null) => {
-    Swal.fire({
+    const swalInstance = Swal.fire({
         html: `
           <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
             <h3 style="margin-bottom: 20px; color: #009ee3; font-size: 24px;">Escaneá con tu app MercadoPago</h3>
@@ -192,9 +191,15 @@ const showMercadoPagoQR = (data, onCancel = null) => {
               alt="QR MercadoPago" 
               style="display: block; margin: 0 auto; border: 4px solid #009ee3; border-radius: 15px; box-shadow: 0 8px 25px rgba(0, 158, 227, 0.3);" 
             />
-            <p style="margin-top:10px;font-size:16px;text-align:center; color: #009ee3; font-weight: bold;">
-              ⏱️ Esperando confirmación...
+            <p id="qr-status" style="margin-top:10px;font-size:16px;text-align:center; color: #009ee3; font-weight: bold;">
+              📱 Escaneá y pagá desde tu app
             </p>
+            <div id="qr-progress" style="margin-top: 10px; display: none;">
+              <div style="width: 200px; height: 4px; background-color: #e0e0e0; border-radius: 2px; overflow: hidden;">
+                <div id="progress-bar" style="width: 0%; height: 100%; background-color: #009ee3; transition: width 0.3s ease;"></div>
+              </div>
+              <p style="font-size: 12px; color: #666; margin-top: 5px; text-align: center;">Confirma el pago en tu app...</p>
+            </div>
           </div>
         `,
         showConfirmButton: false,
@@ -203,14 +208,143 @@ const showMercadoPagoQR = (data, onCancel = null) => {
         cancelButtonColor: '#dc2626',
         width: 500,
         allowOutsideClick: false,
-    }).then((result) => {
+        didOpen: () => {
+            // ✅ INICIAR DETECCIÓN REAL DE ESCANEO
+            if (data.preference_id) {
+                startRealQRScanDetection(data.preference_id);
+            }
+        },
+    });
+
+    swalInstance.then((result) => {
         if (result.dismiss === Swal.DismissReason.cancel && onCancel) {
             onCancel();
         }
     });
+
+    return swalInstance;
 };
 
-// ✅ FUNCIÓN DE POLLING CON DETECCIÓN DE CAMBIOS PARA SEGUNDO VENCIMIENTO
+// ✅ DETECCIÓN REAL DE ESCANEO VIA WEBHOOK
+const startRealQRScanDetection = (preferenceId) => {
+    let scanDetected = false;
+    let scanCheckInterval;
+
+    console.log(
+        '🔍 Iniciando detección real de escaneo QR para preference:',
+        preferenceId
+    );
+
+    // ✅ VERIFICAR ESCANEO CADA 2 SEGUNDOS VIA ENDPOINT
+    scanCheckInterval = setInterval(async () => {
+        if (scanDetected) return;
+
+        try {
+            const response = await fetch(
+                `${baseUrl}/api/qr-scan-status/${preferenceId}`,
+                {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                    cache: 'no-cache',
+                }
+            );
+
+            if (response.ok) {
+                const scanStatus = await response.json();
+
+                if (scanStatus.scanned && !scanDetected) {
+                    console.log(
+                        '📱 ¡QR ESCANEADO DETECTADO VIA WEBHOOK!',
+                        scanStatus
+                    );
+                    markQRAsScanned();
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Error verificando escaneo QR:', error);
+        }
+    }, 2000); // Cada 2 segundos
+
+    // ✅ FUNCIÓN PARA MARCAR QR COMO ESCANEADO
+    const markQRAsScanned = () => {
+        if (scanDetected) return;
+
+        scanDetected = true;
+        console.log('✅ QR marcado como escaneado');
+
+        const statusElement = document.getElementById('qr-status');
+        const progressElement = document.getElementById('qr-progress');
+        const progressBar = document.getElementById('progress-bar');
+
+        if (statusElement) {
+            statusElement.innerHTML =
+                '✅ QR escaneado - Confirma el pago en tu app';
+            statusElement.style.color = '#059669';
+        }
+
+        if (progressElement) {
+            progressElement.style.display = 'block';
+        }
+
+        // ✅ ANIMACIÓN DE PROGRESO
+        if (progressBar) {
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 2;
+                progressBar.style.width = `${Math.min(progress, 90)}%`;
+
+                if (progress >= 90) {
+                    clearInterval(progressInterval);
+                }
+            }, 150);
+
+            window.qrProgressInterval = progressInterval;
+        }
+
+        cleanup();
+    };
+
+    // ✅ FUNCIÓN PARA LIMPIAR
+    const cleanup = () => {
+        if (scanCheckInterval) {
+            clearInterval(scanCheckInterval);
+        }
+
+        // Limpiar tracking en el servidor
+        if (preferenceId) {
+            fetch(`${baseUrl}/api/qr-scan-tracker/${preferenceId}`, {
+                method: 'DELETE',
+            }).catch((err) => console.warn('⚠️ Error limpiando tracker:', err));
+        }
+    };
+
+    // ✅ FUNCIÓN PÚBLICA PARA MARCAR PAGO COMPLETADO
+    window.markQRPaymentCompleted = () => {
+        const progressBar = document.getElementById('progress-bar');
+        const statusElement = document.getElementById('qr-status');
+
+        if (progressBar) {
+            progressBar.style.width = '100%';
+            progressBar.style.backgroundColor = '#059669';
+        }
+
+        if (statusElement) {
+            statusElement.innerHTML = '🎉 ¡Pago confirmado!';
+            statusElement.style.color = '#059669';
+        }
+
+        if (window.qrProgressInterval) {
+            clearInterval(window.qrProgressInterval);
+        }
+
+        cleanup();
+    };
+
+    // Guardar cleanup para llamar externamente
+    window.qrCleanup = cleanup;
+};
+
+// ✅ FUNCIÓN DE POLLING CON DETECCIÓN ESPECÍFICA POR VENCIMIENTO
 const startMercadoPagoPolling = async (
     factura,
     nis,
@@ -316,9 +450,17 @@ const startMercadoPagoPolling = async (
                     console.log('✅ Pago MercadoPago exitoso detectado');
                     clearInterval(pollInterval);
 
-                    if (onSuccess) {
-                        await onSuccess();
+                    // ✅ MARCAR PAGO COMO COMPLETADO VISUALMENTE
+                    if (window.markQRPaymentCompleted) {
+                        window.markQRPaymentCompleted();
                     }
+
+                    // Esperar un momento para mostrar la confirmación visual
+                    setTimeout(async () => {
+                        if (onSuccess) {
+                            await onSuccess();
+                        }
+                    }, 1500);
                     return;
                 }
 
@@ -439,7 +581,7 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
     return await response.json();
 };
 
-// ===== FUNCIÓN PRINCIPAL SIMPLIFICADA =====
+// ===== FUNCIÓN PRINCIPAL =====
 export const processPayment = async (
     paymentData,
     nis,
@@ -503,13 +645,19 @@ export const processPayment = async (
             }
 
             console.log(
-                '🔄 Mostrando QR MercadoPago e iniciando polling:',
+                '🔄 Mostrando QR MercadoPago con detección de escaneo:',
                 paymentId
             );
 
-            // ✅ MOSTRAR QR SIMPLE
+            // ✅ MOSTRAR QR CON DETECCIÓN DE ESCANEO
             showMercadoPagoQR(response, () => {
                 console.log('❌ Usuario canceló QR MercadoPago:', paymentId);
+
+                // Limpiar detección de escaneo
+                if (window.qrCleanup) {
+                    window.qrCleanup();
+                }
+
                 if (onPaymentCancel) onPaymentCancel();
             });
 
@@ -517,7 +665,7 @@ export const processPayment = async (
             startMercadoPagoPolling(
                 paymentData.factura,
                 nis,
-                paymentData.vencimiento, // ✅ PASAR VENCIMIENTO
+                paymentData.vencimiento,
                 // onSuccess
                 async () => {
                     console.log('✅ Pago MercadoPago confirmado:', paymentId);
