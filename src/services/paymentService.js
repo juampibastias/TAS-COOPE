@@ -47,15 +47,19 @@ const showSuccessAlert = (title, text) => {
     });
 };
 
-// ===== FUNCIÓN PARA REFRESCAR ESTADO DE FACTURAS =====
+// ===== FUNCIÓN PARA REFRESCAR ESTADO DE FACTURAS (CORREGIDA) =====
 const refreshFacturasState = async (nis) => {
     try {
         console.log('🔄 Refrescando estado de facturas para NIS:', nis);
 
-        const response = await fetch(`${baseUrl}/api/facturas/${nis}`, {
+        // ✅ USAR ENDPOINT CORRECTO QUE SÍ EXISTE
+        const response = await fetch(`${baseUrl}/api/facturas?nis=${nis}`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            // Forzar request fresco sin cache
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                Pragma: 'no-cache',
+            },
             cache: 'no-cache',
         });
 
@@ -177,7 +181,8 @@ const showModoQR = (data, onCancel = null) => {
     });
 };
 
-const showMercadoPagoQR = (data, onManualCheck = null, onCancel = null) => {
+// ✅ QR MERCADOPAGO SIMPLE - IGUAL QUE MODO
+const showMercadoPagoQR = (data, onCancel = null) => {
     Swal.fire({
         html: `
           <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
@@ -188,32 +193,174 @@ const showMercadoPagoQR = (data, onManualCheck = null, onCancel = null) => {
               style="display: block; margin: 0 auto; border: 4px solid #009ee3; border-radius: 15px; box-shadow: 0 8px 25px rgba(0, 158, 227, 0.3);" 
             />
             <p style="margin-top:10px;font-size:16px;text-align:center; color: #009ee3; font-weight: bold;">
-              📱 Escaneá y pagá desde tu app
-            </p>
-            <p style="margin-top:5px;font-size:14px;text-align:center; color: #666;">
-              Una vez que pagues, esta ventana se cerrará automáticamente
-            </p>
-            <p style="margin-top:5px;font-size:12px;text-align:center; color: #999;">
-              El QR expira en 30 minutos
+              ⏱️ Esperando confirmación...
             </p>
           </div>
         `,
-        showConfirmButton: true,
-        confirmButtonText: 'Ya pagué - Verificar',
-        confirmButtonColor: '#009ee3',
+        showConfirmButton: false,
         showCancelButton: true,
         cancelButtonText: 'Cancelar',
         cancelButtonColor: '#dc2626',
         width: 500,
         allowOutsideClick: false,
-        preConfirm: () => {
-            if (onManualCheck) onManualCheck();
-        },
     }).then((result) => {
         if (result.dismiss === Swal.DismissReason.cancel && onCancel) {
             onCancel();
         }
     });
+};
+
+// ✅ FUNCIÓN DE POLLING CON DETECCIÓN DE CAMBIOS PARA SEGUNDO VENCIMIENTO
+const startMercadoPagoPolling = async (
+    factura,
+    nis,
+    vencimiento,
+    onSuccess,
+    onCancel
+) => {
+    console.log(
+        `🔄 Iniciando polling MercadoPago para factura ${factura}, NIS ${nis}, vencimiento ${vencimiento}`
+    );
+
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutos (cada 5 segundos)
+    let estadoInicial = null;
+    let paymentIdInicial = null;
+
+    const pollInterval = setInterval(async () => {
+        attempts++;
+        console.log(
+            `🔄 Polling MP intento ${attempts}/${maxAttempts} - Vencimiento ${vencimiento}`
+        );
+
+        try {
+            const response = await fetch(`${baseUrl}/api/facturas?nis=${nis}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                },
+                cache: 'no-cache',
+            });
+
+            if (response.ok) {
+                const facturas = await response.json();
+                const facturaActual = facturas.find(
+                    (f) => (f.NROFACT || f.numero) == factura
+                );
+
+                if (!facturaActual) {
+                    console.warn('⚠️ Factura no encontrada en polling MP');
+                    return;
+                }
+
+                const estado = facturaActual.ESTADO;
+                const paymentId = facturaActual.payment_id;
+                const tienePago = paymentId !== null && paymentId !== '';
+
+                console.log(
+                    `📊 Polling MP - Estado: ${estado}, Payment ID: ${paymentId}, Vencimiento: ${vencimiento}`
+                );
+
+                // ✅ PRIMERA VEZ: GUARDAR ESTADO INICIAL
+                if (attempts === 1) {
+                    estadoInicial = estado;
+                    paymentIdInicial = paymentId;
+                    console.log(
+                        `📝 Estado inicial guardado - Estado: ${estadoInicial}, Payment ID: ${paymentIdInicial}`
+                    );
+                    return; // No verificar en el primer intento
+                }
+
+                // ✅ LÓGICA DIFERENTE SEGÚN VENCIMIENTO
+                let pagoExitoso = false;
+
+                if (vencimiento === '1') {
+                    // ✅ PRIMER VENCIMIENTO: Cambio a PARCIAL o EN PROCESO
+                    if (
+                        (estado === 'PARCIAL' || estado === 'EN PROCESO') &&
+                        tienePago &&
+                        estado !== estadoInicial
+                    ) {
+                        console.log(
+                            `✅ Primer vencimiento pagado: ${estadoInicial} → ${estado}`
+                        );
+                        pagoExitoso = true;
+                    }
+                } else if (vencimiento === '2') {
+                    // ✅ SEGUNDO VENCIMIENTO: Debe cambiar de PARCIAL a EN PROCESO
+                    if (
+                        estadoInicial === 'PARCIAL' &&
+                        estado === 'EN PROCESO' &&
+                        tienePago
+                    ) {
+                        console.log(
+                            `✅ Segundo vencimiento pagado: PARCIAL → EN PROCESO`
+                        );
+                        pagoExitoso = true;
+                    }
+                    // O si el payment_id cambió (nuevo pago)
+                    else if (
+                        paymentId &&
+                        paymentId !== paymentIdInicial &&
+                        estado === 'EN PROCESO'
+                    ) {
+                        console.log(
+                            `✅ Segundo vencimiento pagado: Nuevo payment_id ${paymentIdInicial} → ${paymentId}`
+                        );
+                        pagoExitoso = true;
+                    }
+                }
+
+                if (pagoExitoso) {
+                    console.log('✅ Pago MercadoPago exitoso detectado');
+                    clearInterval(pollInterval);
+
+                    if (onSuccess) {
+                        await onSuccess();
+                    }
+                    return;
+                }
+
+                if (estado === 'RECHAZADA') {
+                    console.log('❌ Pago MercadoPago rechazado');
+                    clearInterval(pollInterval);
+
+                    Swal.close();
+                    await showErrorAlert(
+                        'Pago rechazado',
+                        'El pago no pudo ser procesado. Intenta nuevamente.'
+                    );
+
+                    if (onCancel) onCancel();
+                    return;
+                }
+            } else {
+                console.error(
+                    `❌ Error en polling MP: ${response.status} ${response.statusText}`
+                );
+            }
+
+            // ✅ TIMEOUT
+            if (attempts >= maxAttempts) {
+                console.log('⏰ Timeout alcanzado para MercadoPago');
+                clearInterval(pollInterval);
+
+                Swal.close();
+                await showInfoAlert(
+                    'Tiempo agotado',
+                    'El tiempo de espera ha expirado. Verifica el estado de tu pago.'
+                );
+
+                if (onCancel) onCancel();
+            }
+        } catch (error) {
+            console.error('❌ Error en polling MercadoPago:', error);
+        }
+    }, 5000);
+
+    // Cleanup si se cancela
+    return () => clearInterval(pollInterval);
 };
 
 // ===== UTILIDADES DE FECHA =====
@@ -239,12 +386,11 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
     const vencimientoFecha = paymentData.fecha;
     const isFirstVencimiento = paymentData.vencimiento === '1';
 
-    // ✅ FORMATO EXACTO que usa /payment-url
     const vto =
         formatDate(parseDate(paymentData.fecha)) +
         (isFirstVencimiento ? ' VTO_1' : ' VTO_2');
 
-    console.log('🚀 DATOS PARA /payment-qr:', {
+    console.log('🚀 DATOS PARA PAGO:', {
         factura,
         nis,
         fecha_original: paymentData.fecha,
@@ -268,10 +414,9 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
                       },
                   ],
                   metadata: {
-                      // ✅ METADATA IDÉNTICA A /payment
                       nis,
                       factura: factura.toString(),
-                      vencimiento: vto, // "01-07-2025 VTO_1"
+                      vencimiento: vto,
                   },
               })
             : JSON.stringify({
@@ -280,11 +425,6 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
                   nis,
                   vencimientoFecha,
               });
-
-    console.log(
-        '📤 Metadata enviada a /payment-qr:',
-        JSON.parse(body).metadata
-    );
 
     const response = await fetch(url, {
         method: 'POST',
@@ -299,7 +439,7 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
     return await response.json();
 };
 
-// ===== FUNCIÓN PRINCIPAL PARA PROCESAR PAGOS =====
+// ===== FUNCIÓN PRINCIPAL SIMPLIFICADA =====
 export const processPayment = async (
     paymentData,
     nis,
@@ -318,38 +458,15 @@ export const processPayment = async (
             nis,
         });
 
-        // ===== PASO 1: VALIDACIÓN INICIAL CON LOGGING =====
+        // ===== PASO 1: VALIDACIÓN =====
         showLoadingAlert('Validando factura...', 'Verificando estado actual');
-
-        // Logging detallado para diagnóstico
-        console.log('🔍 DATOS ENVIADOS A VALIDACIÓN:', {
-            factura: paymentData.factura,
-            nis: nis,
-            vencimiento: paymentData.vencimiento,
-            fecha: paymentData.fecha,
-            importe: paymentData.importe,
-            timestamp: new Date().toISOString(),
-        });
 
         const validationResult = await validatePaymentStatus(
             paymentData.factura,
             nis
         );
 
-        console.log('📊 RESULTADO DE VALIDACIÓN:', {
-            paymentId,
-            canProceed: validationResult.canProceed,
-            title: validationResult.title,
-            message: validationResult.message,
-            estadoActual: validationResult.estadoActual,
-            timestamp: new Date().toISOString(),
-        });
-
         if (!validationResult.canProceed) {
-            console.log('❌ PAGO BLOQUEADO:', {
-                paymentId,
-                reason: validationResult.message,
-            });
             await showInfoAlert(
                 validationResult.title,
                 validationResult.message
@@ -357,23 +474,14 @@ export const processPayment = async (
             return { success: false, reason: 'validation_failed' };
         }
 
-        // ===== PASO 2: SELECCIONAR MÉTODO DE PAGO =====
-        Swal.close(); // Cerrar loading de validación
+        // ===== PASO 2: MÉTODO DE PAGO =====
+        Swal.close();
         const metodoPago = await showPaymentMethodSelector();
 
         if (!metodoPago) {
-            console.log(
-                '⚠️ Usuario canceló selección de método de pago:',
-                paymentId
-            );
             if (onPaymentCancel) onPaymentCancel();
             return { success: false, reason: 'user_cancelled' };
         }
-
-        console.log('💳 Método de pago seleccionado:', {
-            paymentId,
-            metodoPago,
-        });
 
         // ===== PASO 3: PROCESAR PAGO =====
         showLoadingAlert(
@@ -384,11 +492,9 @@ export const processPayment = async (
         );
 
         const response = await submitPayment(paymentData, nis, metodoPago);
-        console.log('✅ Respuesta de API de pago:', { paymentId, response });
+        Swal.close();
 
-        Swal.close(); // Cerrar loading de procesamiento
-
-        // ===== PASO 4: MANEJAR RESPUESTA SEGÚN MÉTODO =====
+        // ===== PASO 4: MOSTRAR QR Y POLLING =====
         if (metodoPago === 'mercadopago') {
             if (!response.qr_url) {
                 throw new Error(
@@ -397,49 +503,40 @@ export const processPayment = async (
             }
 
             console.log(
-                '🔄 Mostrando QR de MercadoPago y configurando auto-refresh:',
+                '🔄 Mostrando QR MercadoPago e iniciando polling:',
                 paymentId
             );
 
-            // Configurar auto-refresh para MercadoPago (webhook puede tardar)
-            const refreshInterval = setInterval(async () => {
-                console.log(
-                    '🔄 Auto-refresh de facturas (MercadoPago):',
-                    paymentId
-                );
-                await refreshFacturasState(nis);
-            }, 10000); // Cada 10 segundos
+            // ✅ MOSTRAR QR SIMPLE
+            showMercadoPagoQR(response, () => {
+                console.log('❌ Usuario canceló QR MercadoPago:', paymentId);
+                if (onPaymentCancel) onPaymentCancel();
+            });
 
-            // Detener auto-refresh después de 5 minutos
-            setTimeout(() => {
-                clearInterval(refreshInterval);
-                console.log('⏹️ Auto-refresh detenido para:', paymentId);
-            }, 300000);
-
-            showMercadoPagoQR(
-                response,
-                // onManualCheck
+            // ✅ INICIAR POLLING CON DETECCIÓN ESPECÍFICA POR VENCIMIENTO
+            startMercadoPagoPolling(
+                paymentData.factura,
+                nis,
+                paymentData.vencimiento, // ✅ PASAR VENCIMIENTO
+                // onSuccess
                 async () => {
-                    console.log(
-                        '🔍 Verificación manual solicitada:',
-                        paymentId
-                    );
-                    clearInterval(refreshInterval);
+                    console.log('✅ Pago MercadoPago confirmado:', paymentId);
                     await refreshFacturasState(nis);
                     if (onPaymentSuccess) onPaymentSuccess();
                     Swal.close();
+                    await showSuccessAlert(
+                        '¡Pago exitoso!',
+                        'Tu pago ha sido procesado correctamente'
+                    );
+                    window.location.reload();
                 },
                 // onCancel
                 () => {
-                    console.log(
-                        '❌ Usuario canceló QR MercadoPago:',
-                        paymentId
-                    );
-                    clearInterval(refreshInterval);
                     if (onPaymentCancel) onPaymentCancel();
                 }
             );
         } else if (metodoPago === 'modo') {
+            // ===== MODO (sin cambios) =====
             if (!response.qr) {
                 throw new Error('El QR de MODO no fue generado correctamente');
             }
@@ -449,21 +546,15 @@ export const processPayment = async (
                 paymentId
             );
 
-            showModoQR(
-                response,
-                // onCancel
-                () => {
-                    console.log('❌ Usuario canceló QR MODO:', paymentId);
-                    if (onPaymentCancel) onPaymentCancel();
-                }
-            );
+            showModoQR(response, () => {
+                console.log('❌ Usuario canceló QR MODO:', paymentId);
+                if (onPaymentCancel) onPaymentCancel();
+            });
 
-            // Iniciar polling para MODO con callback de éxito
             const isSecondVencimiento = paymentData.vencimiento !== '1';
             startPolling(
                 paymentData.factura,
                 nis,
-                // onSuccess callback
                 async () => {
                     console.log('✅ Pago MODO confirmado:', paymentId);
                     await refreshFacturasState(nis);
@@ -480,19 +571,12 @@ export const processPayment = async (
 
         return { success: true, metodoPago, paymentId };
     } catch (error) {
-        console.error('❌ Error al procesar el pago:', {
-            paymentId,
-            error: error.message,
-            stack: error.stack,
-        });
-
-        Swal.close(); // Asegurar que se cierre cualquier modal
-
+        console.error('❌ Error al procesar el pago:', error);
+        Swal.close();
         await showErrorAlert(
             'Error en el pago',
             error.message || 'No se pudo procesar el pago. Intente nuevamente.'
         );
-
         if (onPaymentCancel) onPaymentCancel();
         return {
             success: false,
