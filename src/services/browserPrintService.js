@@ -2,32 +2,283 @@
 
 import Swal from 'sweetalert2';
 
+// ===== VERIFICAR SI YA ESTÁ CONFIGURADA LA IMPRESORA =====
+function estaImpresoraConfigurada() {
+    try {
+        const config = localStorage.getItem('tas_printer_npi_configured');
+        return config === 'true';
+    } catch (error) {
+        console.log('ℹ️ No se puede acceder a localStorage, usando configuración temporal');
+        return window.tasPrinterConfigured || false;
+    }
+}
+
+// ===== GUARDAR CONFIGURACIÓN DE IMPRESORA =====
+function guardarConfiguracionImpresora() {
+    try {
+        localStorage.setItem('tas_printer_npi_configured', 'true');
+        localStorage.setItem('tas_printer_npi_date', new Date().toISOString());
+        console.log('✅ Configuración de impresora guardada');
+    } catch (error) {
+        console.log('ℹ️ Guardando configuración en memoria temporal');
+        window.tasPrinterConfigured = true;
+    }
+}
+
 // ===== FUNCIÓN PRINCIPAL DE IMPRESIÓN DE TICKETS DE ÉXITO =====
 export async function imprimirTicketDesdeNavegador(datosTicket) {
     try {
-        console.log(
-            '🖨️ Iniciando impresión con NPI Integration Driver...',
-            datosTicket
-        );
+        console.log('🖨️ Iniciando impresión con NPI Integration Driver...', datosTicket);
 
-        // ✅ USAR SOLO WINDOW.PRINT() - NO WEB SERIAL API
-        await imprimirConNPIDriver(datosTicket);
-        console.log('✅ Ticket enviado a NPI Integration Driver');
+        // ✅ VERIFICAR SI YA ESTÁ CONFIGURADA
+        if (estaImpresoraConfigurada()) {
+            console.log('✅ Impresora ya configurada, imprimiendo directamente...');
+            await imprimirConNPIDriverSilencioso(datosTicket);
+            mostrarNotificacionTAS('✅ Comprobante impreso', 'success');
+            return true;
+        } else {
+            console.log('⚠️ Impresora no configurada, solicitando configuración...');
+            await mostrarInstruccionesNPI(datosTicket, 'Impresora requiere configuración inicial');
+            return false;
+        }
 
-        // Notificación discreta para TAS
-        mostrarNotificacionTAS('✅ Comprobante impreso', 'success');
-        return true;
     } catch (error) {
         console.error('❌ Error en impresión:', error);
-
-        // Mostrar instrucciones claras
-        await mostrarInstruccionesNPI(datosTicket, error.message);
+        await mostrarErrorTAS(error.message);
         return false;
     }
 }
 
-// ===== FUNCIÓN ESPECÍFICA PARA NPI INTEGRATION DRIVER =====
+// ===== FUNCIÓN PARA IMPRESIÓN SILENCIOSA (YA CONFIGURADA) =====
+async function imprimirConNPIDriverSilencioso(datosTicket) {
+    try {
+        console.log('🖨️ Impresión silenciosa con NPI Driver ya configurado...');
+
+        const {
+            cliente,
+            nis,
+            factura,
+            fecha,
+            importe,
+            vencimiento,
+            metodoPago,
+            transactionId,
+            fechaPago,
+        } = datosTicket;
+
+        // HTML optimizado para impresión automática silenciosa
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Comprobante de Pago</title>
+                <style>
+                    @page {
+                        size: 80mm auto;
+                        margin: 0;
+                    }
+                    
+                    @media print {
+                        body {
+                            width: 80mm;
+                            font-family: 'Courier New', monospace;
+                            font-size: 11px;
+                            line-height: 1.3;
+                            margin: 0;
+                            padding: 3mm;
+                            color: #000;
+                        }
+                        
+                        .header {
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 14px;
+                            margin-bottom: 4mm;
+                        }
+                        
+                        .separator {
+                            border-top: 1px dashed #000;
+                            margin: 3mm 0;
+                        }
+                        
+                        .section-title {
+                            font-weight: bold;
+                            text-decoration: underline;
+                            margin: 2mm 0 1mm 0;
+                        }
+                        
+                        .amount {
+                            text-align: center;
+                            font-size: 16px;
+                            font-weight: bold;
+                            margin: 4mm 0;
+                            border: 2px solid #000;
+                            padding: 3mm;
+                        }
+                        
+                        .footer {
+                            text-align: center;
+                            margin-top: 4mm;
+                            font-weight: bold;
+                        }
+                    }
+                </style>
+                <script>
+                    window.onload = function() {
+                        // Impresión automática inmediata
+                        setTimeout(function() {
+                            window.print();
+                            // Cerrar ventana después de imprimir
+                            setTimeout(function() {
+                                window.close();
+                            }, 1000);
+                        }, 200);
+                    };
+                </script>
+            </head>
+            <body>
+                <div class="header">
+                    COOPERATIVA POPULAR<br>
+                    COMPROBANTE DE PAGO
+                </div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">CLIENTE:</div>
+                <div>${cliente}</div>
+                <div>NIS: ${nis}</div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">FACTURA:</div>
+                <div>Numero: ${factura}</div>
+                <div>Vencimiento: ${vencimiento}</div>
+                <div>Fecha Vto: ${fecha}</div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">PAGO:</div>
+                <div>Metodo: ${metodoPago}</div>
+                <div>Fecha: ${fechaPago}</div>
+                <div>ID: ${transactionId}</div>
+                
+                <div class="separator"></div>
+                
+                <div class="amount">
+                    IMPORTE PAGADO<br>
+                    ${parseFloat(importe).toLocaleString('es-AR')}
+                </div>
+                
+                <div class="separator"></div>
+                
+                <div class="footer">
+                    ✅ PAGO PROCESADO EXITOSAMENTE<br>
+                    Gracias por su pago<br><br>
+                    ${new Date().toLocaleString('es-AR')}
+                </div>
+            </body>
+            </html>
+        `;
+
+        // Abrir ventana oculta y auto-imprimir
+        const printWindow = window.open('', '_blank', 'width=400,height=600,left=9999,top=9999');
+        
+        if (!printWindow) {
+            throw new Error('No se pudo abrir ventana de impresión');
+        }
+
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+
+        console.log('✅ Ventana de impresión automática creada');
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error en impresión silenciosa:', error);
+        throw error;
+    }
+}
+// ===== FUNCIÓN ESPECÍFICA PARA NPI INTEGRATION DRIVER (CONFIGURACIÓN INICIAL) =====
 async function imprimirConNPIDriver(datosTicket) {
+    try {
+        console.log('🖨️ Imprimiendo con NPI Integration Driver para configuración...');
+
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Test NPI Integration Driver</title>
+                <style>
+                    @page {
+                        size: 80mm auto;
+                        margin: 0;
+                    }
+                    @media print {
+                        body {
+                            width: 80mm;
+                            font-family: 'Courier New', monospace;
+                            font-size: 12px;
+                            margin: 0;
+                            padding: 3mm;
+                        }
+                        .header {
+                            text-align: center;
+                            font-weight: bold;
+                            margin-bottom: 5mm;
+                        }
+                        .test-info {
+                            border: 1px solid #000;
+                            padding: 5mm;
+                            margin: 3mm 0;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    CONFIGURACIÓN NPI INTEGRATION DRIVER
+                </div>
+                <div class="test-info">
+                    <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>Puerto:</strong> USB002</p>
+                    <p><strong>Driver:</strong> NPI Integration Driver</p>
+                    <p><strong>Estado:</strong> CONFIGURANDO</p>
+                </div>
+                <div style="text-align: center; margin-top: 10mm;">
+                    <p>Si ves este texto impreso,</p>
+                    <p>la configuración es correcta.</p>
+                    <p>Los próximos pagos imprimirán automáticamente.</p>
+                </div>
+            </body>
+            </html>
+        `;
+
+        // Abrir ventana para configuración
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+
+        // Ejecutar print para configuración
+        setTimeout(() => {
+            printWindow.print();
+        }, 500);
+
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                try {
+                    printWindow.close();
+                } catch (e) {}
+                resolve(true);
+            }, 2000);
+        });
+
+    } catch (error) {
+        console.error('❌ Error en configuración NPI Driver:', error);
+        throw error;
+    }
+}
     try {
         console.log('🖨️ Imprimiendo con NPI Integration Driver...');
 
@@ -171,12 +422,8 @@ async function imprimirConNPIDriver(datosTicket) {
         `;
 
         // Abrir ventana optimizada para NPI Driver
-        const printWindow = window.open(
-            '',
-            '_blank',
-            'width=400,height=600,scrollbars=yes'
-        );
-
+        const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+        
         if (!printWindow) {
             throw new Error('No se pudo abrir ventana de impresión');
         }
@@ -197,10 +444,8 @@ async function imprimirConNPIDriver(datosTicket) {
             // Verificar cuando se ejecute la impresión
             setTimeout(() => {
                 clearTimeout(timeout);
-                console.log(
-                    '✅ Ventana de impresión configurada para NPI Driver'
-                );
-
+                console.log('✅ Ventana de impresión configurada para NPI Driver');
+                
                 // Cerrar ventana después de un tiempo
                 setTimeout(() => {
                     try {
@@ -209,23 +454,21 @@ async function imprimirConNPIDriver(datosTicket) {
                         console.log('ℹ️ Ventana ya cerrada');
                     }
                 }, 2000);
-
+                
                 resolve(true);
             }, 1000);
         });
+
     } catch (error) {
         console.error('❌ Error en impresión con NPI Driver:', error);
         throw error;
     }
-}
+
 
 // ===== FUNCIÓN PRINCIPAL DE IMPRESIÓN DE TICKETS DE ERROR =====
 export async function imprimirTicketError(datosTicketError) {
     try {
-        console.log(
-            '🖨️ Iniciando impresión de ticket de error con NPI...',
-            datosTicketError
-        );
+        console.log('🖨️ Iniciando impresión de ticket de error con NPI...', datosTicketError);
 
         const {
             cliente,
@@ -369,7 +612,7 @@ export async function imprimirTicketError(datosTicketError) {
         if (printWindow) {
             printWindow.document.write(printContent);
             printWindow.document.close();
-
+            
             setTimeout(() => {
                 try {
                     printWindow.close();
@@ -379,6 +622,7 @@ export async function imprimirTicketError(datosTicketError) {
 
         console.log('✅ Ticket de error enviado a NPI Driver');
         return true;
+
     } catch (error) {
         console.error('❌ Error en impresión de ticket de error:', error);
         return false;

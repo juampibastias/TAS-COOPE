@@ -408,18 +408,19 @@ async function configurarImpresoraNPI() {
 async function probarImpresoraNPI() {
     try {
         Swal.fire({
-            title: 'Probando NPI Integration Driver...',
+            title: 'Configurando NPI Integration Driver...',
             text: 'Se abrirá el diálogo de impresión. Selecciona "NPI Integration Driver"',
             allowOutsideClick: false,
             didOpen: () => Swal.showLoading(),
         });
 
+        // Crear HTML de prueba
         const printContent = `
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>Test NPI Integration Driver</title>
+                <title>Configuración NPI Integration Driver</title>
                 <style>
                     @page {
                         size: 80mm auto;
@@ -448,25 +449,25 @@ async function probarImpresoraNPI() {
             </head>
             <body>
                 <div class="header">
-                    TEST NPI INTEGRATION DRIVER
+                    CONFIGURACIÓN NPI INTEGRATION DRIVER
                 </div>
                 <div class="test-info">
                     <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
                     <p><strong>Puerto:</strong> USB002</p>
                     <p><strong>Driver:</strong> NPI Integration Driver</p>
-                    <p><strong>Estado:</strong> FUNCIONANDO</p>
+                    <p><strong>Estado:</strong> CONFIGURANDO</p>
                 </div>
                 <div style="text-align: center; margin-top: 10mm;">
                     <p>Si ves este texto impreso,</p>
-                    <p>tu impresora está configurada correctamente</p>
-                    <p>para trabajar con la TAS.</p>
+                    <p>la configuración es correcta.</p>
+                    <p>Los próximos pagos imprimirán automáticamente.</p>
                 </div>
             </body>
             </html>
         `;
 
         // Abrir ventana de impresión
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
         printWindow.document.write(printContent);
         printWindow.document.close();
 
@@ -500,23 +501,41 @@ async function probarImpresoraNPI() {
                 });
 
                 if (resultado.isConfirmed) {
+                    // ✅ GUARDAR CONFIGURACIÓN EXITOSA
+                    try {
+                        localStorage.setItem(
+                            'tas_printer_npi_configured',
+                            'true'
+                        );
+                        localStorage.setItem(
+                            'tas_printer_npi_date',
+                            new Date().toISOString()
+                        );
+                        console.log(
+                            '✅ Configuración NPI guardada correctamente'
+                        );
+                    } catch (error) {
+                        window.tasPrinterConfigured = true;
+                        console.log('✅ Configuración NPI guardada en memoria');
+                    }
+
                     await Swal.fire({
                         icon: 'success',
-                        title: '🎉 ¡Impresora configurada!',
+                        title: '🎉 ¡Impresora configurada correctamente!',
                         html: `
                             <div style="text-align: center; padding: 15px;">
-                                <p style="font-size: 18px; color: #059669; font-weight: bold;">✅ NPI Integration Driver funcionando correctamente</p>
+                                <p style="font-size: 18px; color: #059669; font-weight: bold;">✅ NPI Integration Driver configurado</p>
                                 <br>
-                                <p><strong>Ahora todos los pagos imprimirán automáticamente usando:</strong></p>
+                                <p><strong>🚀 A partir de ahora:</strong></p>
                                 <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                                    <p>🖨️ <strong>NPI Integration Driver</strong></p>
-                                    <p>📍 Puerto USB002</p>
-                                    <p>🎯 Método: window.print()</p>
+                                    <p>✅ Todos los pagos imprimirán automáticamente</p>
+                                    <p>✅ Sin diálogos de configuración</p>
+                                    <p>✅ Directo a tu impresora NPI</p>
                                 </div>
-                                <p style="color: #666; font-size: 14px;">La configuración se ha guardado automáticamente</p>
+                                <p style="color: #666; font-size: 14px;">La configuración se ha guardado permanentemente</p>
                             </div>
                         `,
-                        confirmButtonText: 'Perfecto',
+                        confirmButtonText: '¡Perfecto!',
                         confirmButtonColor: '#059669',
                     });
                 } else if (resultado.isDenied) {
@@ -533,8 +552,9 @@ async function probarImpresoraNPI() {
                                     <li><strong>Driver actualizado:</strong> Reinstalar NPI Integration Driver</li>
                                 </ol>
                                 <div style="background: #fef3c7; padding: 10px; border-radius: 8px; margin: 10px 0;">
-                                    <p style="margin: 0; font-size: 14px;"><strong>💡 Tip:</strong> Prueba imprimir una página de prueba desde Windows para verificar que el driver funciona.</p>
+                                    <p style="margin: 0; font-size: 14px;"><strong>💡 Tip:</strong> Intenta hacer una impresión de prueba desde Windows para verificar que el driver funciona.</p>
                                 </div>
+                                <p style="margin-top: 15px;">Puedes intentar la configuración nuevamente cuando esté resuelto.</p>
                             </div>
                         `,
                         confirmButtonText: 'Entendido',
@@ -551,10 +571,10 @@ async function probarImpresoraNPI() {
             }, 3000); // Dar tiempo para que se abra el diálogo
         }, 1000);
     } catch (error) {
-        console.error('Error en prueba NPI:', error);
+        console.error('Error en configuración NPI:', error);
         Swal.fire({
             icon: 'error',
-            title: 'Error en la prueba',
+            title: 'Error en la configuración',
             text: error.message,
             confirmButtonText: 'Reintentar',
         });
