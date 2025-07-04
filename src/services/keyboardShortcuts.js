@@ -269,7 +269,7 @@ class KeyboardShortcuts {
         this.pressedKeys.delete(event.key.toLowerCase());
     }
 
-    buildShortcutString() {
+    /* buildShortcutString() {
         const keys = Array.from(this.pressedKeys).sort();
 
         // Ordenar modificadores primero
@@ -290,7 +290,7 @@ class KeyboardShortcuts {
 
         return sortedKeys.join('+');
     }
-
+ */
     showHelp() {
         const shortcutsList = Array.from(this.shortcuts.entries())
             .map(([key, action]) => `${key}: ${action.description}`)

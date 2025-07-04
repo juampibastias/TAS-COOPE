@@ -325,7 +325,7 @@ export default function TASHomeScreen() {
                                         🖨️
                                     </div>
                                     <h3 className='text-3xl font-bold mb-4 text-white group-hover:text-cyan-100'>
-                                        IMPRIMIR FORMULARIOS
+                                        MAS OPCIONES
                                     </h3>
                                     <p className='text-lg text-blue-100 group-hover:text-white leading-relaxed'>
                                         Imprima facturas anteriores,
@@ -344,70 +344,6 @@ export default function TASHomeScreen() {
                                 </div>
                                 <div className='absolute inset-0 rounded-3xl bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform translate-x-full group-hover:translate-x-[-200%] transition-transform duration-1000'></div>
                             </button>
-                        </div>
-
-                        {/* Información adicional */}
-                        <div className='text-center mt-12'>
-                            <p className='text-lg text-green-200'>
-                                💡 <strong>Tip:</strong> También puede usar las
-                                flechas del teclado para navegar
-                            </p>
-
-                            {/* Atajos de teclado info */}
-                            {process.env.NODE_ENV === 'development' && (
-                                <div className='mt-4 bg-gray-800 bg-opacity-30 rounded-lg p-3 max-w-lg mx-auto text-xs'>
-                                    <p className='text-gray-300 mb-2'>
-                                        <strong>
-                                            Atajos de teclado disponibles:
-                                        </strong>
-                                    </p>
-                                    <div className='grid grid-cols-1 md:grid-cols-2 gap-1 text-left'>
-                                        <span>
-                                            Ctrl+Alt+Shift+C → Configuración
-                                        </span>
-                                        <span>Ctrl+Alt+Shift+H → Ayuda</span>
-                                        <span>
-                                            Ctrl+Alt+Shift+I → Info consola
-                                        </span>
-                                        <span>Ctrl+Alt+Shift+R → Reset</span>
-                                        <span>Ctrl+Alt+F → Fullscreen</span>
-                                        <span>
-                                            Ctrl+Alt+Shift+M → Mantenimiento
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Debug info en desarrollo */}
-                            {process.env.NODE_ENV === 'development' &&
-                                terminalId && (
-                                    <div className='mt-4 bg-gray-800 bg-opacity-30 rounded-lg p-3 max-w-lg mx-auto text-xs'>
-                                        <p className='text-gray-300 font-mono'>
-                                            <strong>Debug PWA/TAS:</strong>
-                                            <br />
-                                            Terminal ID: {terminalId}
-                                            <br />
-                                            Install Step: {installStep}
-                                            <br />
-                                            Instalado:{' '}
-                                            {isInstalled ? 'Sí' : 'No'}
-                                            <br />
-                                            Puede instalar:{' '}
-                                            {canInstall ? 'Sí' : 'No'}
-                                            <br />
-                                            Modo Terminal:{' '}
-                                            {
-                                                process.env
-                                                    .NEXT_PUBLIC_TERMINAL_ENABLED
-                                            }
-                                            <br />
-                                            Backend URL:{' '}
-                                            {process.env
-                                                .NEXT_PUBLIC_BACKEND_URL ||
-                                                process.env.NEXT_PUBLIC_API_URL}
-                                        </p>
-                                    </div>
-                                )}
                         </div>
                     </div>
                 </div>

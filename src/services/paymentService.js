@@ -1,6 +1,11 @@
 import Swal from 'sweetalert2';
 import { validatePaymentStatus } from './facturaService';
 import { startPolling } from './modoPollingService';
+import {
+    imprimirTicketDesdeNavegador,
+    prepararDatosTicket,
+    imprimirTicketError,
+} from './browserPrintService';
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -45,6 +50,97 @@ const showSuccessAlert = (title, text) => {
         confirmButtonColor: '#059669',
         allowOutsideClick: false,
     });
+};
+
+// ===== FUNCIONES DE IMPRESIÓN =====
+
+// Función para imprimir ticket de éxito
+const imprimirTicketExito = async (
+    paymentData,
+    nis,
+    cliente,
+    metodoPago,
+    transactionId
+) => {
+    try {
+        console.log('🖨️ Iniciando impresión de ticket exitoso...');
+
+        const datosTicket = prepararDatosTicket(
+            paymentData.factura,
+            nis,
+            cliente,
+            paymentData,
+            transactionId,
+            metodoPago
+        );
+
+        await imprimirTicketDesdeNavegador(datosTicket);
+        console.log('✅ Ticket de éxito impreso correctamente');
+    } catch (error) {
+        console.error('❌ Error al imprimir ticket de éxito:', error);
+        // No bloquear el flujo por error de impresión
+        Swal.fire({
+            icon: 'warning',
+            title: 'Error de impresión',
+            text: 'El pago fue exitoso pero no se pudo imprimir el comprobante.',
+            confirmButtonText: 'Continuar',
+            confirmButtonColor: '#059669',
+            timer: 3000,
+        });
+    }
+};
+
+// Función para imprimir ticket de error
+const imprimirTicketFallo = async (
+    paymentData,
+    nis,
+    cliente,
+    metodoPago,
+    razonFallo
+) => {
+    try {
+        console.log('🖨️ Iniciando impresión de ticket de fallo...');
+
+        const datosTicketError = {
+            cliente: cliente?.NOMBRE || 'Cliente',
+            nis: nis,
+            factura: paymentData.factura,
+            fecha: paymentData.fecha,
+            importe: paymentData.importe,
+            vencimiento:
+                paymentData.vencimiento === '1'
+                    ? '1° Vencimiento'
+                    : '2° Vencimiento',
+            metodoPago: metodoPago.toUpperCase(),
+            fechaIntento: new Date().toLocaleString('es-AR'),
+            razonFallo: razonFallo,
+            referencia: `ERROR_${Date.now()}`,
+        };
+
+        await imprimirTicketError(datosTicketError);
+        console.log('✅ Ticket de fallo impreso correctamente');
+    } catch (error) {
+        console.error('❌ Error al imprimir ticket de fallo:', error);
+    }
+};
+
+// ===== FUNCIÓN PARA OBTENER DATOS DEL CLIENTE =====
+const obtenerDatosCliente = async (nis) => {
+    try {
+        const response = await fetch(`${baseUrl}/api/cliente?nis=${nis}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-cache',
+        });
+
+        if (response.ok) {
+            return await response.json();
+        }
+    } catch (error) {
+        console.error('❌ Error obteniendo datos del cliente:', error);
+    }
+
+    return { NOMBRE: 'Cliente' }; // Fallback
 };
 
 // ===== FUNCIÓN PARA REFRESCAR ESTADO DE FACTURAS =====
@@ -344,16 +440,17 @@ const startRealQRScanDetection = (preferenceId) => {
     window.qrCleanup = cleanup;
 };
 
-// ✅ FUNCIÓN DE POLLING CON DETECCIÓN ESPECÍFICA POR VENCIMIENTO
+// ✅ FUNCIÓN DE POLLING MERCADOPAGO CON IMPRESIÓN AUTOMÁTICA
 const startMercadoPagoPolling = async (
-    factura,
+    paymentData,
     nis,
-    vencimiento,
+    metodoPago,
+    cliente,
     onSuccess,
     onCancel
 ) => {
     console.log(
-        `🔄 Iniciando polling MercadoPago para factura ${factura}, NIS ${nis}, vencimiento ${vencimiento}`
+        `🔄 Iniciando polling MercadoPago para factura ${paymentData.factura}, NIS ${nis}, vencimiento ${paymentData.vencimiento}`
     );
 
     let attempts = 0;
@@ -364,7 +461,7 @@ const startMercadoPagoPolling = async (
     const pollInterval = setInterval(async () => {
         attempts++;
         console.log(
-            `🔄 Polling MP intento ${attempts}/${maxAttempts} - Vencimiento ${vencimiento}`
+            `🔄 Polling MP intento ${attempts}/${maxAttempts} - Vencimiento ${paymentData.vencimiento}`
         );
 
         try {
@@ -380,7 +477,7 @@ const startMercadoPagoPolling = async (
             if (response.ok) {
                 const facturas = await response.json();
                 const facturaActual = facturas.find(
-                    (f) => (f.NROFACT || f.numero) == factura
+                    (f) => (f.NROFACT || f.numero) == paymentData.factura
                 );
 
                 if (!facturaActual) {
@@ -393,7 +490,7 @@ const startMercadoPagoPolling = async (
                 const tienePago = paymentId !== null && paymentId !== '';
 
                 console.log(
-                    `📊 Polling MP - Estado: ${estado}, Payment ID: ${paymentId}, Vencimiento: ${vencimiento}`
+                    `📊 Polling MP - Estado: ${estado}, Payment ID: ${paymentId}, Vencimiento: ${paymentData.vencimiento}`
                 );
 
                 // ✅ PRIMERA VEZ: GUARDAR ESTADO INICIAL
@@ -409,7 +506,7 @@ const startMercadoPagoPolling = async (
                 // ✅ LÓGICA DIFERENTE SEGÚN VENCIMIENTO
                 let pagoExitoso = false;
 
-                if (vencimiento === '1') {
+                if (paymentData.vencimiento === '1') {
                     // ✅ PRIMER VENCIMIENTO: Cambio a PARCIAL o EN PROCESO
                     if (
                         (estado === 'PARCIAL' || estado === 'EN PROCESO') &&
@@ -421,7 +518,7 @@ const startMercadoPagoPolling = async (
                         );
                         pagoExitoso = true;
                     }
-                } else if (vencimiento === '2') {
+                } else if (paymentData.vencimiento === '2') {
                     // ✅ SEGUNDO VENCIMIENTO: Debe cambiar de PARCIAL a EN PROCESO
                     if (
                         estadoInicial === 'PARCIAL' &&
@@ -455,6 +552,15 @@ const startMercadoPagoPolling = async (
                         window.markQRPaymentCompleted();
                     }
 
+                    // ✅ IMPRIMIR TICKET DE ÉXITO AUTOMÁTICAMENTE
+                    await imprimirTicketExito(
+                        paymentData,
+                        nis,
+                        cliente,
+                        metodoPago,
+                        paymentId
+                    );
+
                     // Esperar un momento para mostrar la confirmación visual
                     setTimeout(async () => {
                         if (onSuccess) {
@@ -467,6 +573,15 @@ const startMercadoPagoPolling = async (
                 if (estado === 'RECHAZADA') {
                     console.log('❌ Pago MercadoPago rechazado');
                     clearInterval(pollInterval);
+
+                    // ✅ IMPRIMIR TICKET DE FALLO
+                    await imprimirTicketFallo(
+                        paymentData,
+                        nis,
+                        cliente,
+                        metodoPago,
+                        'Pago rechazado por el proveedor'
+                    );
 
                     Swal.close();
                     await showErrorAlert(
@@ -487,6 +602,15 @@ const startMercadoPagoPolling = async (
             if (attempts >= maxAttempts) {
                 console.log('⏰ Timeout alcanzado para MercadoPago');
                 clearInterval(pollInterval);
+
+                // ✅ IMPRIMIR TICKET DE TIMEOUT
+                await imprimirTicketFallo(
+                    paymentData,
+                    nis,
+                    cliente,
+                    metodoPago,
+                    'Tiempo de espera agotado'
+                );
 
                 Swal.close();
                 await showInfoAlert(
@@ -581,7 +705,7 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
     return await response.json();
 };
 
-// ===== FUNCIÓN PRINCIPAL =====
+// ===== FUNCIÓN PRINCIPAL CON IMPRESIÓN INTEGRADA =====
 export const processPayment = async (
     paymentData,
     nis,
@@ -591,6 +715,7 @@ export const processPayment = async (
     const paymentId = `${paymentData.factura}_${
         paymentData.vencimiento
     }_${Date.now()}`;
+    let cliente = null;
 
     try {
         console.log('🚀 Iniciando proceso de pago:', {
@@ -600,7 +725,11 @@ export const processPayment = async (
             nis,
         });
 
-        // ===== PASO 1: VALIDACIÓN =====
+        // ===== PASO 1: OBTENER DATOS DEL CLIENTE =====
+        cliente = await obtenerDatosCliente(nis);
+        console.log('👤 Datos del cliente obtenidos:', cliente);
+
+        // ===== PASO 2: VALIDACIÓN =====
         showLoadingAlert('Validando factura...', 'Verificando estado actual');
 
         const validationResult = await validatePaymentStatus(
@@ -616,7 +745,7 @@ export const processPayment = async (
             return { success: false, reason: 'validation_failed' };
         }
 
-        // ===== PASO 2: MÉTODO DE PAGO =====
+        // ===== PASO 3: MÉTODO DE PAGO =====
         Swal.close();
         const metodoPago = await showPaymentMethodSelector();
 
@@ -625,7 +754,7 @@ export const processPayment = async (
             return { success: false, reason: 'user_cancelled' };
         }
 
-        // ===== PASO 3: PROCESAR PAGO =====
+        // ===== PASO 4: PROCESAR PAGO =====
         showLoadingAlert(
             'Procesando pago...',
             `Conectando con ${
@@ -636,7 +765,7 @@ export const processPayment = async (
         const response = await submitPayment(paymentData, nis, metodoPago);
         Swal.close();
 
-        // ===== PASO 4: MOSTRAR QR Y POLLING =====
+        // ===== PASO 5: MOSTRAR QR Y POLLING CON IMPRESIÓN =====
         if (metodoPago === 'mercadopago') {
             if (!response.qr_url) {
                 throw new Error(
@@ -650,8 +779,17 @@ export const processPayment = async (
             );
 
             // ✅ MOSTRAR QR CON DETECCIÓN DE ESCANEO
-            showMercadoPagoQR(response, () => {
+            showMercadoPagoQR(response, async () => {
                 console.log('❌ Usuario canceló QR MercadoPago:', paymentId);
+
+                // ✅ IMPRIMIR TICKET DE CANCELACIÓN
+                await imprimirTicketFallo(
+                    paymentData,
+                    nis,
+                    cliente,
+                    metodoPago,
+                    'Pago cancelado por el usuario'
+                );
 
                 // Limpiar detección de escaneo
                 if (window.qrCleanup) {
@@ -661,11 +799,12 @@ export const processPayment = async (
                 if (onPaymentCancel) onPaymentCancel();
             });
 
-            // ✅ INICIAR POLLING CON DETECCIÓN ESPECÍFICA POR VENCIMIENTO
+            // ✅ INICIAR POLLING CON IMPRESIÓN AUTOMÁTICA
             startMercadoPagoPolling(
-                paymentData.factura,
+                paymentData,
                 nis,
-                paymentData.vencimiento,
+                metodoPago,
+                cliente,
                 // onSuccess
                 async () => {
                     console.log('✅ Pago MercadoPago confirmado:', paymentId);
@@ -684,7 +823,7 @@ export const processPayment = async (
                 }
             );
         } else if (metodoPago === 'modo') {
-            // ===== MODO (sin cambios) =====
+            // ===== MODO CON IMPRESIÓN =====
             if (!response.qr) {
                 throw new Error('El QR de MODO no fue generado correctamente');
             }
@@ -694,17 +833,39 @@ export const processPayment = async (
                 paymentId
             );
 
-            showModoQR(response, () => {
+            showModoQR(response, async () => {
                 console.log('❌ Usuario canceló QR MODO:', paymentId);
+
+                // ✅ IMPRIMIR TICKET DE CANCELACIÓN
+                await imprimirTicketFallo(
+                    paymentData,
+                    nis,
+                    cliente,
+                    metodoPago,
+                    'Pago cancelado por el usuario'
+                );
+
                 if (onPaymentCancel) onPaymentCancel();
             });
 
             const isSecondVencimiento = paymentData.vencimiento !== '1';
+
+            // ✅ POLLING MODO CON CALLBACKS MODIFICADOS PARA IMPRESIÓN
             startPolling(
                 paymentData.factura,
                 nis,
                 async () => {
                     console.log('✅ Pago MODO confirmado:', paymentId);
+
+                    // ✅ IMPRIMIR TICKET DE ÉXITO AUTOMÁTICAMENTE
+                    await imprimirTicketExito(
+                        paymentData,
+                        nis,
+                        cliente,
+                        metodoPago,
+                        paymentId
+                    );
+
                     await refreshFacturasState(nis);
                     if (onPaymentSuccess) onPaymentSuccess();
                     Swal.close();
@@ -712,14 +873,42 @@ export const processPayment = async (
                         '¡Pago exitoso!',
                         'Tu pago ha sido procesado correctamente'
                     );
+                    window.location.reload();
                 },
-                isSecondVencimiento
+                isSecondVencimiento,
+                // ✅ CALLBACK DE ERROR PARA MODO
+                async (errorReason) => {
+                    console.log('❌ Error en pago MODO:', errorReason);
+
+                    // ✅ IMPRIMIR TICKET DE FALLO
+                    await imprimirTicketFallo(
+                        paymentData,
+                        nis,
+                        cliente,
+                        metodoPago,
+                        errorReason || 'Error en el procesamiento'
+                    );
+
+                    if (onPaymentCancel) onPaymentCancel();
+                }
             );
         }
 
         return { success: true, metodoPago, paymentId };
     } catch (error) {
         console.error('❌ Error al procesar el pago:', error);
+
+        // ✅ IMPRIMIR TICKET DE ERROR TÉCNICO
+        if (cliente) {
+            await imprimirTicketFallo(
+                paymentData,
+                nis,
+                cliente,
+                'SISTEMA',
+                error.message || 'Error técnico del sistema'
+            );
+        }
+
         Swal.close();
         await showErrorAlert(
             'Error en el pago',
@@ -750,4 +939,6 @@ export {
     showModoQR,
     showMercadoPagoQR,
     refreshFacturasState,
+    imprimirTicketExito,
+    imprimirTicketFallo,
 };
