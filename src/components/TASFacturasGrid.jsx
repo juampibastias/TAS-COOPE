@@ -476,7 +476,6 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                 >
                     🔍 VERIFICAR SOPORTE
                 </button>
-
                 {/* Botón 2: Test Simple (solo si Web Serial está disponible) */}
                 <button
                     onClick={async () => {
@@ -618,114 +617,72 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                 >
                     🖨️ PROBAR IMPRESORA
                 </button>
+                ¡Excelente! Ya funciona Web Serial API con HTTPS. El problema
+                ahora es que COM5 no es el puerto correcto para tu impresora
+                USB. 🔧 Solución: Identificar el puerto USB correcto Paso 1:
+                Verificar en Windows Administrador de dispositivos (Win + X)
+                Expandir "Puertos (COM y LPT)" ¿Qué puertos aparecen listados?
+                ¿Aparece algo como "USB Serial Port" o el nombre de tu
+                impresora? Paso 2: Identificar tu impresora ¿Qué marca y modelo
+                de impresora térmica tenés? Epson TM-T88V Star TSP143 Citizen
+                CT-S310 Bixolon SRP-350 ¿Otra marca? Paso 3: Verificar conexión
+                USB En Administrador de dispositivos, buscar también en:
+                "Dispositivos de interfaz humana" "Impresoras" "Dispositivos
+                USB" 🎯 Solución rápida: Probá este botón mejorado que muestra
+                TODOS los puertos disponibles: javascript// Reemplazá el botón
+                "CONFIGURAR DEFINITIVO" con este:
                 <button
                     onClick={async () => {
-                        // Verificar nuevamente
                         if (!('serial' in navigator)) {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Aún no habilitado',
-                                html: `
-                    <p>Web Serial API aún no está disponible.</p>
-                    <br>
-                    <p><strong>Verificar:</strong></p>
-                    <ol style="text-align: left;">
-                        <li>¿Reiniciaste Chrome después de habilitar el flag?</li>
-                        <li>¿Estás usando Chrome (no Firefox/Safari)?</li>
-                        <li>¿La página está en HTTPS o localhost?</li>
-                    </ol>
-                `,
-                                confirmButtonText: 'Reintentar',
-                            });
+                            Swal.fire(
+                                'Error',
+                                'Web Serial API no disponible',
+                                'error'
+                            );
                             return;
                         }
 
-                        // ¡Ahora sí funcionará!
                         try {
+                            // Mostrar TODOS los puertos disponibles
                             Swal.fire({
-                                title: '🎉 ¡Web Serial Habilitado!',
-                                text: 'Ahora vamos a configurar tu impresora térmica',
-                                icon: 'success',
-                                confirmButtonText: 'Configurar Impresora',
+                                title: 'Selecciona tu impresora térmica',
+                                html: `
+                    <div style="text-align: left;">
+                        <p><strong>Se abrirá un diálogo con puertos disponibles.</strong></p>
+                        <br>
+                        <p><strong>Buscar puertos que contengan:</strong></p>
+                        <ul>
+                            <li>• "USB Serial"</li>
+                            <li>• "CH340" o "CH341"</li>
+                            <li>• "FTDI"</li>
+                            <li>• "Prolific"</li>
+                            <li>• El nombre de tu impresora</li>
+                        </ul>
+                        <br>
+                        <p><strong>EVITAR:</strong> COM5 (Puerto de comunicaciones) - ese NO es</p>
+                    </div>
+                `,
+                                confirmButtonText: 'Seleccionar Puerto',
                                 confirmButtonColor: '#059669',
                             }).then(async (result) => {
                                 if (result.isConfirmed) {
-                                    // Ejecutar configuración de impresora
                                     try {
-                                        console.log(
-                                            '🖨️ Configurando impresora térmica...'
-                                        );
-
+                                        // Solicitar puerto SIN filtros para mostrar TODOS
                                         const port =
-                                            await navigator.serial.requestPort({
-                                                filters: [
-                                                    { usbVendorId: 0x04b8 }, // Epson
-                                                    { usbVendorId: 0x0519 }, // Star
-                                                    { usbVendorId: 0x067b }, // Prolific
-                                                    { usbVendorId: 0x0fe6 }, // ICS Advent
-                                                    { usbVendorId: 0x0483 }, // STMicroelectronics
-                                                    { usbVendorId: 0x1659 }, // Prolific
-                                                    { usbVendorId: 0x10c4 }, // Silicon Labs
-                                                    { usbVendorId: 0x0403 }, // FTDI
-                                                    { usbVendorId: 0x1a86 }, // QinHeng Electronics
-                                                ],
-                                            });
-
+                                            await navigator.serial.requestPort();
                                         const info = port.getInfo();
+
                                         console.log(
                                             'Puerto seleccionado:',
                                             info
                                         );
 
-                                        await port.open({
-                                            baudRate: 9600,
-                                            dataBits: 8,
-                                            stopBits: 1,
-                                            parity: 'none',
-                                            flowControl: 'none',
-                                        });
-
-                                        const writer =
-                                            port.writable.getWriter();
-
-                                        // Test de impresión simple
-                                        const testData =
-                                            new TextEncoder().encode(
-                                                '\n' +
-                                                    '✅ IMPRESORA CONFIGURADA ✅\n' +
-                                                    '==========================\n' +
-                                                    'COOPERATIVA POPULAR\n' +
-                                                    'Terminal de Autoservicio\n' +
-                                                    '==========================\n' +
-                                                    'Fecha: ' +
-                                                    new Date().toLocaleString() +
-                                                    '\n' +
-                                                    'Estado: FUNCIONANDO\n' +
-                                                    '\n' +
-                                                    'Los pagos ahora imprimiran\n' +
-                                                    'automaticamente.\n' +
-                                                    '\n\n\n'
-                                            );
-
-                                        await writer.write(testData);
-                                        writer.releaseLock();
-
-                                        // Comando de corte
-                                        const writer2 =
-                                            port.writable.getWriter();
-                                        await writer2.write(
-                                            new Uint8Array([0x1d, 0x56, 0x00])
-                                        );
-                                        writer2.releaseLock();
-
-                                        await port.close();
-
-                                        const resultado = await Swal.fire({
-                                            icon: 'question',
-                                            title: '¿Imprimió correctamente?',
+                                        // Mostrar información del puerto seleccionado
+                                        const confirmar = await Swal.fire({
+                                            title: 'Puerto seleccionado',
                                             html: `
                                 <div style="text-align: left;">
-                                    <p><strong>Impresora detectada:</strong></p>
+                                    <p><strong>Información del puerto:</strong></p>
                                     <p>VendorId: 0x${
                                         info.usbVendorId?.toString(16) || 'N/A'
                                     }</p>
@@ -733,83 +690,120 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                         info.usbProductId?.toString(16) || 'N/A'
                                     }</p>
                                     <br>
-                                    <p><strong>¿Se imprimió el ticket de configuración?</strong></p>
+                                    <p><strong>¿Este puerto corresponde a tu impresora térmica?</strong></p>
+                                    <p style="font-size: 12px; color: #666;">Si no estás seguro, selecciona "Probar" para hacer una impresión de prueba.</p>
                                 </div>
                             `,
                                             showDenyButton: true,
-                                            confirmButtonText:
-                                                '✅ SÍ, PERFECTO',
-                                            denyButtonText: '❌ NO IMPRIMIÓ',
+                                            showCancelButton: true,
+                                            confirmButtonText: '✅ SÍ, PROBAR',
+                                            denyButtonText:
+                                                '❌ NO, ELEGIR OTRO',
+                                            cancelButtonText: 'Cancelar',
                                             confirmButtonColor: '#059669',
-                                            denyButtonColor: '#dc2626',
+                                            denyButtonColor: '#d97706',
+                                            cancelButtonColor: '#dc2626',
                                         });
 
-                                        if (resultado.isConfirmed) {
-                                            Swal.fire({
-                                                icon: 'success',
-                                                title: '🎊 ¡Configuración Completa!',
-                                                html: `
-                                    <div style="text-align: center;">
-                                        <h3 style="color: #059669;">✅ Impresora Configurada</h3>
-                                        <p>Los pagos de MercadoPago y MODO ahora imprimirán automáticamente.</p>
-                                        <br>
-                                        <div style="background: #f0f9ff; padding: 15px; border-radius: 8px;">
-                                            <p style="margin: 0; font-weight: bold;">🎯 Todo listo para operar</p>
-                                        </div>
-                                    </div>
-                                `,
-                                                confirmButtonText:
-                                                    '¡Excelente!',
-                                                confirmButtonColor: '#059669',
-                                                allowOutsideClick: false,
+                                        if (confirmar.isConfirmed) {
+                                            // Probar impresión
+                                            await port.open({
+                                                baudRate: 9600,
+                                                dataBits: 8,
+                                                stopBits: 1,
+                                                parity: 'none',
+                                                flowControl: 'none',
                                             });
-                                        } else {
+
+                                            const writer =
+                                                port.writable.getWriter();
+                                            const testData =
+                                                new TextEncoder().encode(
+                                                    '\n' +
+                                                        'TEST DE PUERTO CORRECTO\n' +
+                                                        '========================\n' +
+                                                        'VendorId: 0x' +
+                                                        (info.usbVendorId?.toString(
+                                                            16
+                                                        ) || 'N/A') +
+                                                        '\n' +
+                                                        'ProductId: 0x' +
+                                                        (info.usbProductId?.toString(
+                                                            16
+                                                        ) || 'N/A') +
+                                                        '\n' +
+                                                        '========================\n' +
+                                                        'Si ves esto, el puerto\n' +
+                                                        'es el correcto!\n' +
+                                                        '\n' +
+                                                        'Fecha: ' +
+                                                        new Date().toLocaleString() +
+                                                        '\n' +
+                                                        '\n\n\n'
+                                                );
+
+                                            await writer.write(testData);
+                                            writer.releaseLock();
+
+                                            // Corte
+                                            const writer2 =
+                                                port.writable.getWriter();
+                                            await writer2.write(
+                                                new Uint8Array([
+                                                    0x1d, 0x56, 0x00,
+                                                ])
+                                            );
+                                            writer2.releaseLock();
+
+                                            await port.close();
+
+                                            const resultado = await Swal.fire({
+                                                icon: 'question',
+                                                title: '¿Imprimió correctamente?',
+                                                showDenyButton: true,
+                                                confirmButtonText:
+                                                    '✅ SÍ IMPRIMIÓ',
+                                                denyButtonText:
+                                                    '❌ NO IMPRIMIÓ',
+                                                confirmButtonColor: '#059669',
+                                                denyButtonColor: '#dc2626',
+                                            });
+
+                                            if (resultado.isConfirmed) {
+                                                Swal.fire({
+                                                    icon: 'success',
+                                                    title: '🎉 ¡Puerto correcto encontrado!',
+                                                    html: `
+                                        <p>La impresora está configurada correctamente.</p>
+                                        <p><strong>Ahora todos los pagos imprimirán automáticamente.</strong></p>
+                                    `,
+                                                    confirmButtonText:
+                                                        'Perfecto',
+                                                });
+                                            } else {
+                                                Swal.fire({
+                                                    icon: 'warning',
+                                                    title: 'Puerto incorrecto',
+                                                    text: 'Vamos a probar con otro puerto.',
+                                                    confirmButtonText:
+                                                        'Reintentar',
+                                                });
+                                            }
+                                        } else if (confirmar.isDenied) {
                                             Swal.fire({
-                                                icon: 'warning',
-                                                title: 'Revisar configuración',
-                                                html: `
-                                    <p><strong>La comunicación funcionó pero no imprimió.</strong></p>
-                                    <br>
-                                    <p><strong>Verificar:</strong></p>
-                                    <ul style="text-align: left;">
-                                        <li>Impresora encendida</li>
-                                        <li>Papel cargado correctamente</li>
-                                        <li>Cable USB funcionando</li>
-                                        <li>Modelo compatible con ESC/POS</li>
-                                    </ul>
-                                    <br>
-                                    <p><strong>¿Qué marca/modelo de impresora tenés?</strong></p>
-                                `,
-                                                confirmButtonText: 'Reintentar',
-                                                confirmButtonColor: '#d97706',
+                                                icon: 'info',
+                                                title: 'Elegir otro puerto',
+                                                text: 'Haz clic en "CONFIGURAR DEFINITIVO" nuevamente para elegir otro puerto.',
+                                                confirmButtonText: 'Entendido',
                                             });
                                         }
                                     } catch (error) {
                                         console.error('Error:', error);
-
-                                        let mensaje = error.message;
-                                        if (
-                                            error.message.includes(
-                                                'No port selected'
-                                            )
-                                        ) {
-                                            mensaje =
-                                                'No seleccionaste ningún puerto. Asegurate de que la impresora esté conectada y encendida.';
-                                        } else if (
-                                            error.message.includes(
-                                                'Failed to open'
-                                            )
-                                        ) {
-                                            mensaje =
-                                                'No se pudo abrir el puerto. La impresora puede estar en uso por otra aplicación.';
-                                        }
-
-                                        Swal.fire({
-                                            icon: 'error',
-                                            title: 'Error de configuración',
-                                            text: mensaje,
-                                            confirmButtonText: 'Reintentar',
-                                        });
+                                        Swal.fire(
+                                            'Error',
+                                            error.message,
+                                            'error'
+                                        );
                                     }
                                 }
                             });
