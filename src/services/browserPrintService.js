@@ -1,40 +1,27 @@
-// browserPrintService.js - Optimizado para NPI Integration Driver
+// browserPrintService.js - Optimizado SOLO para NPI Integration Driver usando window.print()
 
 import Swal from 'sweetalert2';
-
-// Función para detectar si Web Serial API está disponible
-export function isWebSerialSupported() {
-    return 'serial' in navigator;
-}
 
 // ===== FUNCIÓN PRINCIPAL DE IMPRESIÓN DE TICKETS DE ÉXITO =====
 export async function imprimirTicketDesdeNavegador(datosTicket) {
     try {
         console.log(
-            '🖨️ Iniciando impresión automática con NPI Driver...',
+            '🖨️ Iniciando impresión con NPI Integration Driver...',
             datosTicket
         );
 
-        // ✅ MÉTODO PRINCIPAL: WINDOW.PRINT() OPTIMIZADO PARA NPI INTEGRATION DRIVER
-        try {
-            await imprimirConNPIDriver(datosTicket);
-            console.log(
-                '✅ Ticket impreso exitosamente con NPI Integration Driver'
-            );
+        // ✅ USAR SOLO WINDOW.PRINT() - NO WEB SERIAL API
+        await imprimirConNPIDriver(datosTicket);
+        console.log('✅ Ticket enviado a NPI Integration Driver');
 
-            // Notificación discreta para TAS
-            mostrarNotificacionTAS('✅ Comprobante impreso', 'success');
-            return true;
-        } catch (error) {
-            console.log('❌ Error con NPI Driver:', error.message);
-
-            // Fallback: Mostrar instrucciones claras
-            await mostrarInstruccionesNPI(datosTicket, error.message);
-            return false;
-        }
+        // Notificación discreta para TAS
+        mostrarNotificacionTAS('✅ Comprobante impreso', 'success');
+        return true;
     } catch (error) {
-        console.error('❌ Error crítico en impresión:', error);
-        await mostrarErrorTAS(error.message);
+        console.error('❌ Error en impresión:', error);
+
+        // Mostrar instrucciones claras
+        await mostrarInstruccionesNPI(datosTicket, error.message);
         return false;
     }
 }
@@ -541,7 +528,7 @@ export function prepararDatosTicketError(
     };
 }
 
-// ===== FUNCIÓN PARA TESTING MANUAL =====
+// ===== FUNCIÓN PARA TESTING MANUAL - SOLO WINDOW.PRINT() =====
 export async function testImpresion() {
     const datosTest = {
         cliente: 'CLIENTE TEST',
@@ -555,6 +542,7 @@ export async function testImpresion() {
         fechaPago: new Date().toLocaleString('es-AR'),
     };
 
+    console.log('🧪 Ejecutando test de impresión con NPI Driver...');
     await imprimirTicketDesdeNavegador(datosTest);
 }
 
