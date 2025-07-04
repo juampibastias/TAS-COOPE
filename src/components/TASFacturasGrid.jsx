@@ -53,7 +53,7 @@ function calcularImportesFactura(factura) {
 
 // Función para contar facturas realmente pendientes
 function contarFacturasPendientes(facturas) {
-    return facturas.filter((factura) => {
+    return facturas.filter(factura => {
         const calculado = calcularImportesFactura(factura);
         return calculado.habilitarPago1 || calculado.habilitarPago2;
     }).length;
@@ -66,23 +66,14 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
     const estaVencido = isVencido(factura.CTA1_VTO);
 
     return (
-        <div
+        <div 
             className={`border p-4 rounded-lg transition-all transform hover:scale-105 h-full flex flex-col justify-between ${
-                calculado.habilitarPago1 || calculado.habilitarPago2
-                    ? 'bg-red-900/50 border-red-400 hover:bg-red-900/60 shadow-lg hover:shadow-red-500/30 cursor-pointer animate-pulse'
+                (calculado.habilitarPago1 || calculado.habilitarPago2) 
+                    ? 'bg-red-900/50 border-red-400 hover:bg-red-900/60 shadow-lg hover:shadow-red-500/30 cursor-pointer animate-pulse' 
                     : 'bg-red-900/20 border-red-600/40 hover:bg-red-900/25'
             }`}
-            onClick={
-                calculado.habilitarPago1 || calculado.habilitarPago2
-                    ? () => onPagar(factura)
-                    : undefined
-            }
-            style={{
-                cursor:
-                    calculado.habilitarPago1 || calculado.habilitarPago2
-                        ? 'pointer'
-                        : 'default',
-            }}
+            onClick={(calculado.habilitarPago1 || calculado.habilitarPago2) ? () => onPagar(factura) : undefined}
+            style={{ cursor: (calculado.habilitarPago1 || calculado.habilitarPago2) ? 'pointer' : 'default' }}
         >
             {/* Header de la factura */}
             <div className='flex justify-between items-start mb-3'>
@@ -99,42 +90,34 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
                     </p>
                 </div>
             </div>
-
+            
             {/* Vencimientos con colores originales */}
             <div className='flex-1 mb-3'>
                 {/* Primer vencimiento */}
-                <div
-                    className={`p-3 rounded mb-2 ${
-                        calculado.estadoPago1 === 'PAGADO'
-                            ? 'bg-blue-900/30 border border-blue-500'
-                            : 'bg-green-900/30'
-                    }`}
-                >
+                <div className={`p-3 rounded mb-2 ${
+                    calculado.estadoPago1 === 'PAGADO'
+                        ? 'bg-blue-900/30 border border-blue-500'
+                        : 'bg-green-900/30'
+                }`}>
                     <div className='flex justify-between items-center'>
-                        <span
-                            className={`text-sm ${
-                                calculado.estadoPago1 === 'PAGADO'
-                                    ? 'text-blue-200'
-                                    : 'text-green-200'
-                            }`}
-                        >
+                        <span className={`text-sm ${
+                            calculado.estadoPago1 === 'PAGADO'
+                                ? 'text-blue-200'
+                                : 'text-green-200'
+                        }`}>
                             1° {factura.CTA1_VTO}
                             {estaVencido && ' ⚠️'}
                         </span>
                         <div className='flex items-center gap-1'>
-                            <span
-                                className={`font-bold text-sm ${
-                                    calculado.estadoPago1 === 'PAGADO'
-                                        ? 'text-blue-100'
-                                        : 'text-green-100'
-                                }`}
-                            >
+                            <span className={`font-bold text-sm ${
+                                calculado.estadoPago1 === 'PAGADO'
+                                    ? 'text-blue-100'
+                                    : 'text-green-100'
+                            }`}>
                                 ${calculado.importe1.toLocaleString()}
                             </span>
                             {calculado.estadoPago1 === 'PAGADO' && (
-                                <span className='text-blue-200 text-sm'>
-                                    ✅
-                                </span>
+                                <span className='text-blue-200 text-sm'>✅</span>
                             )}
                         </div>
                     </div>
@@ -142,62 +125,48 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
 
                 {/* Segundo vencimiento */}
                 {calculado.tieneSegundoVencimiento && (
-                    <div
-                        className={`p-3 rounded ${
-                            calculado.estadoPago2 === 'PAGADO'
-                                ? 'bg-blue-900/30 border border-blue-500'
-                                : 'bg-orange-900/30'
-                        }`}
-                    >
+                    <div className={`p-3 rounded ${
+                        calculado.estadoPago2 === 'PAGADO'
+                            ? 'bg-blue-900/30 border border-blue-500'
+                            : 'bg-orange-900/30'
+                    }`}>
                         <div className='flex justify-between items-center'>
-                            <span
-                                className={`text-sm ${
-                                    calculado.estadoPago2 === 'PAGADO'
-                                        ? 'text-blue-200'
-                                        : 'text-orange-200'
-                                }`}
-                            >
+                            <span className={`text-sm ${
+                                calculado.estadoPago2 === 'PAGADO'
+                                    ? 'text-blue-200'
+                                    : 'text-orange-200'
+                            }`}>
                                 2° {factura.CTA2_VTO}
                             </span>
                             <div className='flex items-center gap-1'>
-                                <span
-                                    className={`font-bold text-sm ${
-                                        calculado.estadoPago2 === 'PAGADO'
-                                            ? 'text-blue-100'
-                                            : 'text-orange-100'
-                                    }`}
-                                >
+                                <span className={`font-bold text-sm ${
+                                    calculado.estadoPago2 === 'PAGADO'
+                                        ? 'text-blue-100'
+                                        : 'text-orange-100'
+                                }`}>
                                     ${calculado.importe2.toLocaleString()}
                                 </span>
                                 {calculado.estadoPago2 === 'PAGADO' && (
-                                    <span className='text-blue-200 text-sm'>
-                                        ✅
-                                    </span>
+                                    <span className='text-blue-200 text-sm'>✅</span>
                                 )}
                             </div>
                         </div>
                     </div>
                 )}
             </div>
-
+            
             {/* Call to action mejorado para facturas pendientes */}
             {(calculado.habilitarPago1 || calculado.habilitarPago2) && (
                 <div className='text-center p-4 bg-gradient-to-r from-green-600 to-green-500 rounded-lg shadow-lg hover:shadow-green-500/50 transition-all transform hover:scale-105 border-2 border-green-400'>
-                    <p className='text-white font-bold text-lg animate-bounce'>
-                        👆 TOCAR PARA PAGAR
-                    </p>
-                    <p className='text-green-100 text-sm mt-1'>
-                        ¡Pago disponible!
-                    </p>
+                    <p className='text-white font-bold text-lg animate-bounce'>👆 TOCAR PARA PAGAR</p>
+                    <p className='text-green-100 text-sm mt-1'>¡Pago disponible!</p>
                 </div>
             )}
-
+            
             {/* Estado para facturas pagadas */}
             {!calculado.habilitarPago1 && !calculado.habilitarPago2 && (
                 <div className='text-center p-3 bg-blue-800/30 rounded border border-blue-500/30'>
-                    <p className='text-blue-200 font-semibold text-sm'>
-                        ✅ FACTURA PAGADA
-                    </p>
+                    <p className='text-blue-200 font-semibold text-sm'>✅ FACTURA PAGADA</p>
                 </div>
             )}
         </div>
@@ -225,16 +194,10 @@ function PaymentModal({ factura, nis }) {
             <div style="margin-bottom: 12px;">
                 <div style="background: rgba(34, 197, 94, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(34, 197, 94, 0.3);">
                     <h3 style="margin: 0 0 4px 0; color: #16a34a; font-size: 14px; font-weight: bold;">1° VENCIMIENTO</h3>
-                    <p style="margin: 2px 0; color: #374151; font-size: 12px;">Fecha: ${
-                        factura.CTA1_VTO
-                    }</p>
+                    <p style="margin: 2px 0; color: #374151; font-size: 12px;">Fecha: ${factura.CTA1_VTO}</p>
                     <p style="margin: 2px 0; color: #16a34a; font-size: 18px; font-weight: bold;">$${calculado.importe1.toLocaleString()}</p>
                 </div>
-                <button id="btn-pagar-venc1" data-factura="${
-                    factura.NROFACT
-                }" data-vencimiento="1" data-fecha="${
-            factura.CTA1_VTO
-        }" data-importe="${calculado.importe1}" style="
+                <button id="btn-pagar-venc1" data-factura="${factura.NROFACT}" data-vencimiento="1" data-fecha="${factura.CTA1_VTO}" data-importe="${calculado.importe1}" style="
                     background: linear-gradient(135deg, #16a34a, #15803d);
                     color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 6px;
@@ -250,16 +213,10 @@ function PaymentModal({ factura, nis }) {
             <div style="margin-bottom: 12px;">
                 <div style="background: rgba(234, 179, 8, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(234, 179, 8, 0.3);">
                     <h3 style="margin: 0 0 4px 0; color: #d97706; font-size: 14px; font-weight: bold;">2° VENCIMIENTO</h3>
-                    <p style="margin: 2px 0; color: #374151; font-size: 12px;">Fecha: ${
-                        factura.CTA2_VTO
-                    }</p>
+                    <p style="margin: 2px 0; color: #374151; font-size: 12px;">Fecha: ${factura.CTA2_VTO}</p>
                     <p style="margin: 2px 0; color: #d97706; font-size: 18px; font-weight: bold;">$${calculado.importe2.toLocaleString()}</p>
                 </div>
-                <button id="btn-pagar-venc2" data-factura="${
-                    factura.NROFACT
-                }" data-vencimiento="2" data-fecha="${
-            factura.CTA2_VTO
-        }" data-importe="${calculado.importe2}" style="
+                <button id="btn-pagar-venc2" data-factura="${factura.NROFACT}" data-vencimiento="2" data-fecha="${factura.CTA2_VTO}" data-importe="${calculado.importe2}" style="
                     background: linear-gradient(135deg, #d97706, #b45309);
                     color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold;
                     border-radius: 8px; cursor: pointer; width: 100%;
@@ -309,13 +266,11 @@ function PaymentModal({ factura, nis }) {
 
                 btnVenc1.addEventListener('mouseenter', () => {
                     btnVenc1.style.transform = 'scale(1.02)';
-                    btnVenc1.style.boxShadow =
-                        '0 6px 20px rgba(22, 163, 74, 0.6)';
+                    btnVenc1.style.boxShadow = '0 6px 20px rgba(22, 163, 74, 0.6)';
                 });
                 btnVenc1.addEventListener('mouseleave', () => {
                     btnVenc1.style.transform = 'scale(1)';
-                    btnVenc1.style.boxShadow =
-                        '0 4px 15px rgba(22, 163, 74, 0.4)';
+                    btnVenc1.style.boxShadow = '0 4px 15px rgba(22, 163, 74, 0.4)';
                 });
             }
 
@@ -334,13 +289,11 @@ function PaymentModal({ factura, nis }) {
 
                 btnVenc2.addEventListener('mouseenter', () => {
                     btnVenc2.style.transform = 'scale(1.02)';
-                    btnVenc2.style.boxShadow =
-                        '0 6px 20px rgba(217, 119, 6, 0.6)';
+                    btnVenc2.style.boxShadow = '0 6px 20px rgba(217, 119, 6, 0.6)';
                 });
                 btnVenc2.addEventListener('mouseleave', () => {
                     btnVenc2.style.transform = 'scale(1)';
-                    btnVenc2.style.boxShadow =
-                        '0 4px 15px rgba(217, 119, 6, 0.4)';
+                    btnVenc2.style.boxShadow = '0 4px 15px rgba(217, 119, 6, 0.4)';
                 });
             }
         },
@@ -372,12 +325,8 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
         return (
             <div className='bg-green-800/30 p-6 rounded-xl text-center'>
                 <div className='text-6xl mb-4'>✅</div>
-                <p className='text-2xl text-green-200 font-bold'>
-                    No tienes facturas pendientes
-                </p>
-                <p className='text-green-300 text-lg mt-2'>
-                    ¡Tu cuenta está al día!
-                </p>
+                <p className='text-2xl text-green-200 font-bold'>No tienes facturas pendientes</p>
+                <p className='text-green-300 text-lg mt-2'>¡Tu cuenta está al día!</p>
             </div>
         );
     }
@@ -385,10 +334,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
     const facturasPendientes = contarFacturasPendientes(facturasImpagas);
     const filasMaximas = calcularFilasMaximas(facturasImpagas.length);
     const columnasGrid = calcularColumnasGrid(facturasImpagas.length);
-    const facturasMostrar = Math.min(
-        facturasImpagas.length,
-        filasMaximas * parseInt(columnasGrid.split('-')[2])
-    );
+    const facturasMostrar = Math.min(facturasImpagas.length, filasMaximas * parseInt(columnasGrid.split('-')[2]));
 
     const handlePagar = (factura) => {
         PaymentModal({ factura, nis });
@@ -407,23 +353,19 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
             <h3 className='text-xl font-bold mb-4 text-lime-200 text-center'>
                 FACTURAS PENDIENTES ({facturasPendientes})
             </h3>
-
+            
             {/* Grid auto-ajustable sin scroll */}
             <div className='flex-1 min-h-0'>
-                <div
-                    className={`grid ${columnasGrid} gap-4 h-full auto-rows-fr`}
-                >
-                    {facturasImpagas
-                        .slice(0, facturasMostrar)
-                        .map((factura, index) => (
-                            <FacturaCard
-                                key={index}
-                                factura={factura}
-                                nis={nis}
-                                onPagar={handlePagar}
-                                onDescargar={handleDescargar}
-                            />
-                        ))}
+                <div className={`grid ${columnasGrid} gap-4 h-full auto-rows-fr`}>
+                    {facturasImpagas.slice(0, facturasMostrar).map((factura, index) => (
+                        <FacturaCard
+                            key={index}
+                            factura={factura}
+                            nis={nis}
+                            onPagar={handlePagar}
+                            onDescargar={handleDescargar}
+                        />
+                    ))}
                 </div>
             </div>
 
@@ -431,14 +373,13 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
             {facturasImpagas.length > facturasMostrar && (
                 <div className='text-center mt-3 p-2 bg-yellow-900/40 border border-yellow-500 rounded'>
                     <p className='text-yellow-200 text-sm font-semibold'>
-                        📋 +{facturasImpagas.length - facturasMostrar} facturas
-                        adicionales
+                        📋 +{facturasImpagas.length - facturasMostrar} facturas adicionales
                     </p>
                 </div>
             )}
 
             {/* BOTONES DE DIAGNÓSTICO DE IMPRESORA */}
-            <div className='fixed top-4 right-4 z-50 flex space-x-2'>
+            <div className="fixed top-4 right-4 z-50 flex space-x-2">
                 {/* Botón 1: Verificar Web Serial */}
                 <button
                     onClick={() => {
@@ -447,7 +388,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                 icon: 'success',
                                 title: '✅ Web Serial Disponible',
                                 text: 'Tu navegador soporta impresión directa',
-                                confirmButtonText: 'Continuar',
+                                confirmButtonText: 'Continuar'
                             });
                         } else {
                             Swal.fire({
@@ -468,11 +409,11 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                     </div>
                                 `,
                                 confirmButtonText: 'Entendido',
-                                width: 500,
+                                width: 500
                             });
                         }
                     }}
-                    className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                 >
                     🔍 VERIFICAR SOPORTE
                 </button>
@@ -481,11 +422,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                 <button
                     onClick={async () => {
                         if (!('serial' in navigator)) {
-                            Swal.fire(
-                                'Error',
-                                'Web Serial API no disponible en este navegador',
-                                'error'
-                            );
+                            Swal.fire('Error', 'Web Serial API no disponible en este navegador', 'error');
                             return;
                         }
 
@@ -494,13 +431,13 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                 title: 'Conectando con impresora...',
                                 text: 'Selecciona tu impresora térmica en el siguiente diálogo',
                                 allowOutsideClick: false,
-                                didOpen: () => Swal.showLoading(),
+                                didOpen: () => Swal.showLoading()
                             });
 
                             // Solicitar puerto
                             const port = await navigator.serial.requestPort();
                             const info = port.getInfo();
-
+                            
                             console.log('Puerto seleccionado:', info);
 
                             // Abrir puerto
@@ -509,33 +446,29 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                 dataBits: 8,
                                 stopBits: 1,
                                 parity: 'none',
-                                flowControl: 'none',
+                                flowControl: 'none'
                             });
 
                             // Enviar texto simple
                             const writer = port.writable.getWriter();
                             const texto = new TextEncoder().encode(
                                 '\n' +
-                                    'TEST DE IMPRESORA TERMICA\n' +
-                                    '=========================\n' +
-                                    'Fecha: ' +
-                                    new Date().toLocaleString() +
-                                    '\n' +
-                                    'Estado: FUNCIONANDO\n' +
-                                    '\n' +
-                                    'Si ves este texto,\n' +
-                                    'la impresora funciona!\n' +
-                                    '\n\n\n'
+                                'TEST DE IMPRESORA TERMICA\n' +
+                                '=========================\n' +
+                                'Fecha: ' + new Date().toLocaleString() + '\n' +
+                                'Estado: FUNCIONANDO\n' +
+                                '\n' +
+                                'Si ves este texto,\n' +
+                                'la impresora funciona!\n' +
+                                '\n\n\n'
                             );
-
+                            
                             await writer.write(texto);
                             writer.releaseLock();
 
                             // Comando de corte
                             const writer2 = port.writable.getWriter();
-                            await writer2.write(
-                                new Uint8Array([0x1d, 0x56, 0x00])
-                            ); // Corte
+                            await writer2.write(new Uint8Array([0x1D, 0x56, 0x00])); // Corte
                             writer2.releaseLock();
 
                             // Cerrar puerto
@@ -548,14 +481,8 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                 html: `
                                     <div style="text-align: left;">
                                         <p><strong>Puerto usado:</strong></p>
-                                        <p>VendorId: 0x${
-                                            info.usbVendorId?.toString(16) ||
-                                            'N/A'
-                                        }</p>
-                                        <p>ProductId: 0x${
-                                            info.usbProductId?.toString(16) ||
-                                            'N/A'
-                                        }</p>
+                                        <p>VendorId: 0x${info.usbVendorId?.toString(16) || 'N/A'}</p>
+                                        <p>ProductId: 0x${info.usbProductId?.toString(16) || 'N/A'}</p>
                                         <br>
                                         <p><strong>¿La impresora imprimió el texto de prueba?</strong></p>
                                     </div>
@@ -564,7 +491,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                 confirmButtonText: '✅ SÍ IMPRIMIÓ',
                                 denyButtonText: '❌ NO IMPRIMIÓ',
                                 confirmButtonColor: '#059669',
-                                denyButtonColor: '#dc2626',
+                                denyButtonColor: '#dc2626'
                             });
 
                             if (resultado.isConfirmed) {
@@ -572,7 +499,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                     icon: 'success',
                                     title: '¡Perfecto!',
                                     text: 'La impresora está configurada correctamente. Ahora los pagos imprimirán automáticamente.',
-                                    confirmButtonText: 'Excelente',
+                                    confirmButtonText: 'Excelente'
                                 });
                             } else if (resultado.isDenied) {
                                 Swal.fire({
@@ -589,32 +516,29 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                         </ul>
                                         <p><strong>Verificá estos puntos y reintentá</strong></p>
                                     `,
-                                    confirmButtonText: 'Entendido',
+                                    confirmButtonText: 'Entendido'
                                 });
                             }
+
                         } catch (error) {
                             console.error('Error:', error);
-
+                            
                             let mensaje = error.message;
                             if (error.message.includes('No port selected')) {
-                                mensaje =
-                                    'No se seleccionó ningún puerto. Verificá que la impresora esté conectada.';
-                            } else if (
-                                error.message.includes('Failed to open')
-                            ) {
-                                mensaje =
-                                    'No se pudo abrir el puerto. Verificá que la impresora esté encendida y no esté en uso.';
+                                mensaje = 'No se seleccionó ningún puerto. Verificá que la impresora esté conectada.';
+                            } else if (error.message.includes('Failed to open')) {
+                                mensaje = 'No se pudo abrir el puerto. Verificá que la impresora esté encendida y no esté en uso.';
                             }
 
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error en la prueba',
                                 text: mensaje,
-                                confirmButtonText: 'Reintentar',
+                                confirmButtonText: 'Reintentar'
                             });
                         }
                     }}
-                    className='bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded'
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
                 >
                     🖨️ PROBAR IMPRESORA
                 </button>
