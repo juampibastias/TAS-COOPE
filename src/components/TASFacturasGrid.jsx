@@ -653,14 +653,14 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
             )}
 
             {/* BOTÓN DE CONFIGURACIÓN NPI INTEGRATION DRIVER */}
-            <div className='fixed top-4 right-4 z-50'>
+            {/* <div className='fixed top-4 right-4 z-50'>
                 <button
                     onClick={configurarImpresoraNPI}
                     className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105'
                 >
                     🖨️ CONFIGURAR IMPRESORA NPI
                 </button>
-            </div>
+            </div> */}
         </div>
     );
 }
