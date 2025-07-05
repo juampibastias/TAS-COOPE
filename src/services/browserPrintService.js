@@ -1,25 +1,62 @@
-// browserPrintService.js - CLIENTE PARA SERVICIO TAS
+// browserPrintService.js - SOLUCIÓN FINAL PARA TAS
 
 import Swal from 'sweetalert2';
 
 // ===== CONFIGURACIÓN DEL SERVICIO TAS =====
 const TAS_SERVICE_CONFIG = {
-    url: 'http://localhost:9100',
-    endpoints: {
-        imprimir: '/imprimir',
-        estado: '/estado',
-        test: '/test',
-    },
+    url: '/api/imprimir-tas', // API del servidor principal
     timeout: 5000,
 };
+
+// ===== DETECTAR IP LOCAL AUTOMÁTICAMENTE =====
+async function obtenerIPLocal() {
+    try {
+        // Método 1: Usar WebRTC para detectar IP local
+        return new Promise((resolve) => {
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+            });
+
+            pc.createDataChannel('');
+            pc.createOffer().then((offer) => pc.setLocalDescription(offer));
+
+            pc.onicecandidate = (ice) => {
+                if (ice && ice.candidate && ice.candidate.candidate) {
+                    const myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(
+                        ice.candidate.candidate
+                    );
+                    if (myIP && myIP[1] && myIP[1] !== '127.0.0.1') {
+                        pc.close();
+                        resolve(myIP[1]);
+                    }
+                }
+            };
+
+            // Fallback después de 3 segundos
+            setTimeout(() => {
+                pc.close();
+                resolve('192.168.1.12'); // IP por defecto si no detecta
+            }, 3000);
+        });
+    } catch (error) {
+        console.log(
+            'No se pudo detectar IP automáticamente, usando IP guardada'
+        );
+        return localStorage.getItem('tas-ip-local') || '192.168.1.12';
+    }
+}
 
 // ===== FUNCIÓN PRINCIPAL - IMPRESIÓN REAL SIN DIÁLOGOS =====
 export async function imprimirTicketDesdeNavegador(datosTicket) {
     try {
-        console.log('🖨️ Enviando a servicio TAS local...', datosTicket);
+        console.log('🖨️ Enviando a servicio TAS...', datosTicket);
 
-        // ✅ MÉTODO 1: Servicio TAS Local (SIN DIÁLOGOS)
-        const exitosoTAS = await enviarAServicioTAS(datosTicket);
+        // Obtener IP local del cliente
+        const ipLocal = await obtenerIPLocal();
+        console.log('📍 IP detectada:', ipLocal);
+
+        // Enviar al backend con la IP del cliente
+        const exitosoTAS = await enviarAServicioTAS(datosTicket, ipLocal);
         if (exitosoTAS) {
             mostrarNotificacionTAS(
                 '✅ Comprobante impreso automáticamente',
@@ -28,7 +65,7 @@ export async function imprimirTicketDesdeNavegador(datosTicket) {
             return true;
         }
 
-        // ❌ SERVICIO NO DISPONIBLE: Mostrar instrucciones
+        // Si falla, mostrar instrucciones
         await mostrarInstruccionesServicioTAS(datosTicket);
         return false;
     } catch (error) {
@@ -38,41 +75,36 @@ export async function imprimirTicketDesdeNavegador(datosTicket) {
     }
 }
 
-// ===== ENVIAR A SERVICIO TAS LOCAL =====
-async function enviarAServicioTAS(datosTicket) {
+// ===== ENVIAR A SERVICIO TAS A TRAVÉS DEL BACKEND =====
+async function enviarAServicioTAS(datosTicket, ipTAS) {
     try {
-        console.log('📡 Conectando con servicio TAS local...');
+        console.log('📡 Enviando al backend para reenvío a TAS...');
 
-        const response = await fetch(
-            `${TAS_SERVICE_CONFIG.url}${TAS_SERVICE_CONFIG.endpoints.imprimir}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(datosTicket),
-                signal: AbortSignal.timeout(TAS_SERVICE_CONFIG.timeout),
-            }
-        );
+        const response = await fetch(TAS_SERVICE_CONFIG.url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                ipTAS: ipTAS, // IP del cliente TAS
+                datos: datosTicket, // Datos del ticket
+            }),
+            signal: AbortSignal.timeout(TAS_SERVICE_CONFIG.timeout),
+        });
 
         if (response.ok) {
             const resultado = await response.json();
-            console.log('✅ Impresión exitosa via servicio TAS:', resultado);
+            console.log('✅ Impresión exitosa via backend:', resultado);
             return true;
         } else {
-            console.log(
-                '❌ Servicio TAS respondió con error:',
-                response.status
-            );
+            console.log('❌ Backend respondió con error:', response.status);
             return false;
         }
     } catch (error) {
         if (error.name === 'AbortError') {
-            console.log('⏰ Timeout conectando con servicio TAS');
-        } else if (error.message.includes('fetch')) {
-            console.log('🔌 Servicio TAS no disponible - no está ejecutándose');
+            console.log('⏰ Timeout conectando con backend');
         } else {
-            console.log('❌ Error conectando con servicio TAS:', error.message);
+            console.log('❌ Error conectando con backend:', error.message);
         }
         return false;
     }
@@ -81,13 +113,17 @@ async function enviarAServicioTAS(datosTicket) {
 // ===== VERIFICAR ESTADO DEL SERVICIO TAS =====
 export async function verificarServicioTAS() {
     try {
-        const response = await fetch(
-            `${TAS_SERVICE_CONFIG.url}${TAS_SERVICE_CONFIG.endpoints.estado}`,
-            {
-                method: 'GET',
-                signal: AbortSignal.timeout(3000),
-            }
-        );
+        const ipLocal = await obtenerIPLocal();
+
+        const response = await fetch(TAS_SERVICE_CONFIG.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ipTAS: ipLocal,
+                datos: { test: true },
+            }),
+            signal: AbortSignal.timeout(3000),
+        });
 
         if (response.ok) {
             const estado = await response.json();
@@ -102,41 +138,42 @@ export async function verificarServicioTAS() {
     }
 }
 
-// ===== PROBAR IMPRESIÓN TAS =====
-export async function probarImpresionTAS() {
-    try {
-        console.log('🧪 Enviando prueba de impresión...');
-
-        const response = await fetch(
-            `${TAS_SERVICE_CONFIG.url}${TAS_SERVICE_CONFIG.endpoints.test}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                signal: AbortSignal.timeout(TAS_SERVICE_CONFIG.timeout),
+// ===== CONFIGURAR IP MANUALMENTE =====
+export async function configurarIPTAS() {
+    const { value: nuevaIP } = await Swal.fire({
+        title: '🌐 Configurar IP del Terminal TAS',
+        html: `
+            <div style="text-align: left; padding: 20px;">
+                <p>Ingresa la IP local de este terminal TAS:</p>
+                <p style="font-size: 12px; color: #666;">
+                    Para encontrarla, abre CMD y ejecuta: <code>ipconfig</code>
+                </p>
+            </div>
+        `,
+        input: 'text',
+        inputPlaceholder: '192.168.1.12',
+        inputValue: await obtenerIPLocal(),
+        showCancelButton: true,
+        confirmButtonText: '💾 Guardar',
+        cancelButtonText: 'Cancelar',
+        inputValidator: (value) => {
+            if (!value || !/^(\d{1,3}\.){3}\d{1,3}$/.test(value)) {
+                return 'Ingresa una IP válida (ej: 192.168.1.12)';
             }
-        );
+        },
+    });
 
-        if (response.ok) {
-            const resultado = await response.json();
-            console.log('✅ Prueba de impresión exitosa:', resultado);
-            mostrarNotificacionTAS('✅ Prueba de impresión exitosa', 'success');
-            return true;
-        } else {
-            console.log('❌ Error en prueba de impresión');
-            mostrarNotificacionTAS('❌ Error en prueba de impresión', 'error');
-            return false;
-        }
-    } catch (error) {
-        console.error('❌ Error probando impresión TAS:', error);
-        mostrarNotificacionTAS('❌ Servicio TAS no disponible', 'error');
-        return false;
+    if (nuevaIP) {
+        localStorage.setItem('tas-ip-local', nuevaIP);
+        mostrarNotificacionTAS(`✅ IP configurada: ${nuevaIP}`, 'success');
+        return nuevaIP;
     }
 }
 
 // ===== MOSTRAR INSTRUCCIONES SERVICIO TAS =====
 async function mostrarInstruccionesServicioTAS(datosTicket) {
+    const ipActual = await obtenerIPLocal();
+
     return new Promise((resolve) => {
         const modal = document.createElement('div');
         modal.style.cssText = `
@@ -166,7 +203,7 @@ async function mostrarInstruccionesServicioTAS(datosTicket) {
                 <div style="font-size: 64px; margin-bottom: 20px;">⚠️</div>
                 <h2 style="font-size: 28px; margin: 0 0 20px 0;">Servicio TAS No Disponible</h2>
                 <p style="font-size: 16px; margin-bottom: 25px; opacity: 0.9; line-height: 1.5;">
-                    El pago fue <strong>exitoso</strong>, pero el servicio de impresión automática no está funcionando.
+                    El pago fue <strong>exitoso</strong>, pero el servicio de impresión no responde.
                 </p>
                 
                 <div style="
@@ -180,21 +217,9 @@ async function mostrarInstruccionesServicioTAS(datosTicket) {
                     <div style="font-size: 14px; line-height: 1.8;">
                         <p style="margin: 8px 0;"><strong>1.</strong> Buscar en el escritorio: <code>"TAS - Iniciar Servidor"</code></p>
                         <p style="margin: 8px 0;"><strong>2.</strong> Hacer doble clic para iniciar el servicio</p>
-                        <p style="margin: 8px 0;"><strong>3.</strong> Reintentar el pago</p>
+                        <p style="margin: 8px 0;"><strong>3.</strong> Verificar que diga "puerto 9100"</p>
+                        <p style="margin: 8px 0;"><strong>4.</strong> Reintentar el pago</p>
                     </div>
-                </div>
-
-                <div style="
-                    background: rgba(59, 130, 246, 0.1);
-                    padding: 20px;
-                    border-radius: 12px;
-                    margin: 20px 0;
-                    border: 1px solid rgba(59, 130, 246, 0.3);
-                ">
-                    <h4 style="margin: 0 0 10px 0; color: #60a5fa;">🔧 Si no está instalado:</h4>
-                    <p style="margin: 0; font-size: 14px;">
-                        Contactar al administrador para instalar el servicio de impresión TAS
-                    </p>
                 </div>
 
                 <div style="
@@ -208,37 +233,53 @@ async function mostrarInstruccionesServicioTAS(datosTicket) {
                     <p style="margin: 0; font-size: 14px;">
                         Factura N° <strong>${
                             datosTicket.factura
-                        }</strong> - ${parseFloat(
+                        }</strong> - $${parseFloat(
             datosTicket.importe
         ).toLocaleString('es-AR')}
                     </p>
+                    <p style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.8;">
+                        IP detectada: ${ipActual}
+                    </p>
                 </div>
 
-                <div style="display: flex; gap: 20px; justify-content: center; margin-top: 30px;">
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px; flex-wrap: wrap;">
                     <button id="verificarServicio" style="
                         background: #2563eb;
                         color: white;
                         border: none;
-                        padding: 15px 25px;
-                        font-size: 16px;
+                        padding: 12px 20px;
+                        font-size: 14px;
                         font-weight: bold;
                         border-radius: 8px;
                         cursor: pointer;
                         transition: all 0.3s;
-                        min-width: 180px;
-                    ">🔍 VERIFICAR SERVICIO</button>
+                        min-width: 140px;
+                    ">🔍 VERIFICAR</button>
+                    
+                    <button id="configurarIP" style="
+                        background: #d97706;
+                        color: white;
+                        border: none;
+                        padding: 12px 20px;
+                        font-size: 14px;
+                        font-weight: bold;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                        min-width: 140px;
+                    ">🌐 CONFIG IP</button>
                     
                     <button id="continuarSinServicio" style="
                         background: rgba(255,255,255,0.2);
                         color: white;
                         border: 1px solid rgba(255,255,255,0.3);
-                        padding: 15px 25px;
-                        font-size: 16px;
+                        padding: 12px 20px;
+                        font-size: 14px;
                         font-weight: bold;
                         border-radius: 8px;
                         cursor: pointer;
                         transition: all 0.3s;
-                        min-width: 180px;
+                        min-width: 140px;
                     ">CONTINUAR</button>
                 </div>
             </div>
@@ -246,6 +287,7 @@ async function mostrarInstruccionesServicioTAS(datosTicket) {
 
         document.body.appendChild(modal);
 
+        // Botón verificar servicio
         modal
             .querySelector('#verificarServicio')
             .addEventListener('click', async () => {
@@ -255,13 +297,15 @@ async function mostrarInstruccionesServicioTAS(datosTicket) {
 
                 const estado = await verificarServicioTAS();
                 if (estado) {
-                    btn.innerHTML = '✅ SERVICIO ONLINE';
+                    btn.innerHTML = '✅ ONLINE';
                     btn.style.background = '#059669';
 
-                    // Reintentar impresión
                     setTimeout(async () => {
                         document.body.removeChild(modal);
-                        const exitoso = await enviarAServicioTAS(datosTicket);
+                        const exitoso = await enviarAServicioTAS(
+                            datosTicket,
+                            ipActual
+                        );
                         if (exitoso) {
                             mostrarNotificacionTAS(
                                 '✅ Comprobante impreso automáticamente',
@@ -271,12 +315,25 @@ async function mostrarInstruccionesServicioTAS(datosTicket) {
                         resolve(exitoso);
                     }, 1500);
                 } else {
-                    btn.innerHTML = '❌ SERVICIO OFFLINE';
+                    btn.innerHTML = '❌ OFFLINE';
                     btn.style.background = '#dc2626';
                     btn.disabled = false;
                 }
             });
 
+        // Botón configurar IP
+        modal
+            .querySelector('#configurarIP')
+            .addEventListener('click', async () => {
+                const nuevaIP = await configurarIPTAS();
+                if (nuevaIP) {
+                    modal.querySelector(
+                        '.opacity-80'
+                    ).textContent = `IP detectada: ${nuevaIP}`;
+                }
+            });
+
+        // Botón continuar
         modal
             .querySelector('#continuarSinServicio')
             .addEventListener('click', () => {
@@ -288,7 +345,6 @@ async function mostrarInstruccionesServicioTAS(datosTicket) {
 
 // ===== NOTIFICACIÓN DISCRETA TAS =====
 function mostrarNotificacionTAS(mensaje, tipo = 'success') {
-    // Remover notificación anterior
     const anterior = document.getElementById('toast-tas');
     if (anterior) {
         try {
@@ -322,7 +378,6 @@ function mostrarNotificacionTAS(mensaje, tipo = 'success') {
     `;
     toast.textContent = mensaje;
 
-    // Agregar animación
     const style = document.createElement('style');
     style.textContent = `
         @keyframes slideInRight {
@@ -345,8 +400,7 @@ function mostrarNotificacionTAS(mensaje, tipo = 'success') {
     }, 4000);
 }
 
-// ===== FUNCIONES AUXILIARES PARA EXPORTAR =====
-
+// ===== FUNCIONES AUXILIARES =====
 export function prepararDatosTicket(
     factura,
     nis,
@@ -385,67 +439,7 @@ export async function imprimirTicketError(datosTicketError) {
     return await imprimirTicketDesdeNavegador(datosTicketError);
 }
 
-export function prepararDatosTicketError(
-    factura,
-    nis,
-    cliente,
-    paymentData,
-    metodoPago,
-    razonFallo,
-    referencia
-) {
-    const fechaActual = new Date();
-
-    return {
-        cliente: cliente.NOMBRE || 'Cliente',
-        nis: nis,
-        factura: factura,
-        fecha: paymentData.fecha,
-        importe: paymentData.importe,
-        vencimiento:
-            paymentData.vencimiento === '1'
-                ? '1° Vencimiento'
-                : '2° Vencimiento',
-        metodoPago: metodoPago.toUpperCase(),
-        fechaIntento: fechaActual.toLocaleString('es-AR'),
-        razonFallo: razonFallo,
-        referencia: referencia,
-    };
-}
-
-// ===== DIAGNÓSTICO TAS =====
-export async function diagnosticoTAS() {
-    console.log('🔍 === DIAGNÓSTICO TAS ===');
-
-    // Verificar servicio
-    const estado = await verificarServicioTAS();
-    console.log('Servicio TAS:', estado ? '✅ Online' : '❌ Offline');
-
-    // Verificar conectividad
-    try {
-        const response = await fetch('http://localhost:9100/estado', {
-            method: 'GET',
-            signal: AbortSignal.timeout(2000),
-        });
-        console.log(
-            'Puerto 9100:',
-            response.ok ? '✅ Accesible' : '❌ No responde'
-        );
-    } catch (error) {
-        console.log('Puerto 9100: ❌ No accesible');
-    }
-
-    // Verificar fecha/hora
-    console.log('Timestamp:', new Date().toISOString());
-
-    // Mostrar información del navegador
-    console.log('User Agent:', navigator.userAgent);
-    console.log('URL:', window.location.href);
-
-    return estado;
-}
-
-// Testing
+// ===== TESTING =====
 export async function testImpresion() {
     const datosTest = {
         cliente: 'CLIENTE TEST TAS',
@@ -462,5 +456,14 @@ export async function testImpresion() {
     await imprimirTicketDesdeNavegador(datosTest);
 }
 
-// ===== EXPORTAR CONFIGURACIÓN PARA DEBUG =====
-export const TAS_CONFIG = TAS_SERVICE_CONFIG;
+// ===== DIAGNÓSTICO =====
+export async function diagnosticoTAS() {
+    console.log('🔍 === DIAGNÓSTICO TAS ===');
+    const ipLocal = await obtenerIPLocal();
+    console.log('IP Local:', ipLocal);
+
+    const estado = await verificarServicioTAS();
+    console.log('Estado TAS:', estado ? '✅ Online' : '❌ Offline');
+
+    return { ip: ipLocal, estado };
+}
