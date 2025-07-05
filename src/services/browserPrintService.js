@@ -1,544 +1,200 @@
-// browserPrintService.js - IMPRESIÓN 100% AUTOMÁTICA SIN DIÁLOGOS
+// browserPrintService.js - SOLUCIÓN REAL PARA TAS
 
 import Swal from 'sweetalert2';
 
-// ===== FUNCIÓN PRINCIPAL DE IMPRESIÓN DE TICKETS DE ÉXITO =====
+// ===== FUNCIÓN PRINCIPAL - IMPRESIÓN REAL AUTOMÁTICA =====
 export async function imprimirTicketDesdeNavegador(datosTicket) {
     try {
-        console.log(
-            '🖨️ Impresión automática silenciosa iniciada...',
-            datosTicket
-        );
+        console.log('🖨️ Iniciando impresión REAL automática...', datosTicket);
 
-        // ✅ IMPRESIÓN DIRECTA A NPI INTEGRATION DRIVER SIN DIÁLOGOS
-        await imprimirDirectoNPI(datosTicket);
+        // ✅ MÉTODO 1: API Backend para impresión directa
+        const impresoExitoso = await enviarABackendParaImpresion(datosTicket);
 
-        // Notificación muy discreta
-        mostrarNotificacionTAS('✅ Comprobante impreso', 'success');
-        return true;
+        if (impresoExitoso) {
+            mostrarNotificacionTAS(
+                '✅ Comprobante impreso automáticamente',
+                'success'
+            );
+            return true;
+        } else {
+            // ✅ MÉTODO 2: Fallback con instrucciones claras
+            await mostrarSolucionTAS(datosTicket);
+            return false;
+        }
     } catch (error) {
-        console.error('❌ Error en impresión automática:', error);
-        // Solo mostrar notificación discreta, no interrumpir el flujo
-        mostrarNotificacionTAS('⚠️ Error impresión', 'error');
+        console.error('❌ Error en impresión:', error);
+        await mostrarSolucionTAS(datosTicket);
         return false;
     }
 }
 
-// ===== IMPRESIÓN DIRECTA SIN DIÁLOGOS =====
-async function imprimirDirectoNPI(datosTicket) {
+// ===== ENVÍO A BACKEND PARA IMPRESIÓN DIRECTA =====
+async function enviarABackendParaImpresion(datosTicket) {
     try {
-        // ✅ MÉTODO PRINCIPAL: Iframe con window.print() automático pero sin mostrar diálogo
-        await imprimirConIframeAutomatico(datosTicket);
-        console.log('✅ Impresión automática ejecutada exitosamente');
-        return true;
-    } catch (error) {
-        console.error('❌ Error en impresión directa:', error);
-        throw error;
-    }
-}
+        console.log('📡 Enviando a backend para impresión directa...');
 
-// ===== IFRAME CON IMPRESIÓN AUTOMÁTICA MEJORADA =====
-async function imprimirConIframeAutomatico(datosTicket) {
-    try {
-        const {
-            cliente,
-            nis,
-            factura,
-            fecha,
-            importe,
-            vencimiento,
-            metodoPago,
-            transactionId,
-            fechaPago,
-        } = datosTicket;
+        // Preparar datos para el backend
+        const datosImpresion = {
+            tipo: 'comprobante_pago',
+            impresora: 'NPI Integration Driver',
+            datos: datosTicket,
+            formato: 'termico_80mm',
+            timestamp: new Date().toISOString(),
+        };
 
-        // HTML ultra-optimizado para impresión AUTOMÁTICA
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Comprobante</title>
-                <style>
-                    @page { 
-                        size: 80mm auto; 
-                        margin: 0; 
-                    }
-                    @media print {
-                        body {
-                            width: 80mm;
-                            font-family: 'Courier New', monospace;
-                            font-size: 10px;
-                            line-height: 1.2;
-                            margin: 0;
-                            padding: 2mm;
-                            color: #000;
-                            background: white;
-                        }
-                        .header { text-align: center; font-weight: bold; margin-bottom: 3mm; }
-                        .separator { border-top: 1px dashed #000; margin: 2mm 0; }
-                        .section { font-weight: bold; margin: 1mm 0; }
-                        .amount { 
-                            text-align: center; 
-                            font-size: 14px; 
-                            font-weight: bold; 
-                            margin: 3mm 0; 
-                            border: 1px solid #000; 
-                            padding: 2mm; 
-                        }
-                        .footer { text-align: center; margin-top: 3mm; }
-                    }
-                    @media screen {
-                        body { 
-                            font-family: 'Courier New', monospace;
-                            font-size: 12px;
-                            margin: 20px;
-                            padding: 10px;
-                            width: 300px;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    COOPERATIVA POPULAR<br>
-                    COMPROBANTE DE PAGO
-                </div>
-                <div class="separator"></div>
-                <div class="section">CLIENTE:</div>
-                <div>${cliente}</div>
-                <div>NIS: ${nis}</div>
-                <div class="separator"></div>
-                <div class="section">FACTURA:</div>
-                <div>N°: ${factura}</div>
-                <div>Venc: ${vencimiento}</div>
-                <div>Fecha: ${fecha}</div>
-                <div class="separator"></div>
-                <div class="section">PAGO:</div>
-                <div>${metodoPago}</div>
-                <div>${fechaPago}</div>
-                <div>ID: ${transactionId}</div>
-                <div class="separator"></div>
-                <div class="amount">
-                    IMPORTE PAGADO<br>
-                    ${parseFloat(importe).toLocaleString('es-AR')}
-                </div>
-                <div class="separator"></div>
-                <div class="footer">
-                    ✅ PAGO EXITOSO<br>
-                    ${new Date().toLocaleString('es-AR')}
-                </div>
-            </body>
-            </html>
-        `;
-
-        return new Promise((resolve) => {
-            // Crear iframe visible temporalmente para impresión
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = `
-                position: fixed !important;
-                left: 50% !important;
-                top: 50% !important;
-                width: 400px !important;
-                height: 600px !important;
-                transform: translate(-50%, -50%) !important;
-                border: 2px solid #059669 !important;
-                border-radius: 8px !important;
-                z-index: 99999 !important;
-                background: white !important;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
-            `;
-
-            // Agregar al DOM
-            document.body.appendChild(iframe);
-
-            // Escribir contenido
-            const iframeDoc =
-                iframe.contentDocument || iframe.contentWindow.document;
-            iframeDoc.open();
-            iframeDoc.write(printContent);
-            iframeDoc.close();
-
-            // Mostrar overlay de "Imprimiendo..."
-            const overlay = document.createElement('div');
-            overlay.style.cssText = `
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                background: rgba(0,0,0,0.8) !important;
-                z-index: 99998 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                color: white !important;
-                font-size: 24px !important;
-                font-weight: bold !important;
-            `;
-            overlay.innerHTML = `
-                <div style="text-align: center; background: #059669; padding: 30px; border-radius: 12px;">
-                    <div style="font-size: 48px; margin-bottom: 20px;">🖨️</div>
-                    <div>Imprimiendo comprobante...</div>
-                    <div style="font-size: 16px; margin-top: 10px; opacity: 0.8;">Selecciona "NPI Integration Driver"</div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-
-            // Ejecutar impresión después de un momento
-            setTimeout(() => {
-                try {
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
-                    console.log('✅ window.print() ejecutado automáticamente');
-
-                    // Remover elementos después de 3 segundos
-                    setTimeout(() => {
-                        try {
-                            document.body.removeChild(iframe);
-                            document.body.removeChild(overlay);
-                        } catch (e) {
-                            console.log('ℹ️ Elementos ya removidos');
-                        }
-                        resolve(true);
-                    }, 3000);
-                } catch (e) {
-                    console.error('❌ Error ejecutando print:', e);
-                    try {
-                        document.body.removeChild(iframe);
-                        document.body.removeChild(overlay);
-                    } catch (e2) {}
-                    resolve(false);
-                }
-            }, 1000); // Dar tiempo para que se renderice
-        });
-    } catch (error) {
-        console.error('❌ Error en iframe automático:', error);
-        throw error;
-    }
-}
-
-// ===== MÉTODO ALTERNATIVO: ENVÍO DIRECTO AL SPOOLER DE WINDOWS =====
-async function enviarAlSpoolerWindows(datosTicket) {
-    try {
-        const {
-            cliente,
-            nis,
-            factura,
-            fecha,
-            importe,
-            vencimiento,
-            metodoPago,
-            transactionId,
-            fechaPago,
-        } = datosTicket;
-
-        // Crear comando para envío directo al spooler de Windows
-        const comando = `
-@echo off
-echo COOPERATIVA POPULAR > temp_ticket.txt
-echo COMPROBANTE DE PAGO >> temp_ticket.txt
-echo ================================ >> temp_ticket.txt
-echo CLIENTE: ${cliente} >> temp_ticket.txt
-echo NIS: ${nis} >> temp_ticket.txt
-echo ================================ >> temp_ticket.txt
-echo FACTURA: ${factura} >> temp_ticket.txt
-echo VENCIMIENTO: ${vencimiento} >> temp_ticket.txt
-echo FECHA VTO: ${fecha} >> temp_ticket.txt
-echo ================================ >> temp_ticket.txt
-echo METODO: ${metodoPago} >> temp_ticket.txt
-echo FECHA: ${fechaPago} >> temp_ticket.txt
-echo ID: ${transactionId} >> temp_ticket.txt
-echo ================================ >> temp_ticket.txt
-echo IMPORTE PAGADO >> temp_ticket.txt
-echo ${parseFloat(importe).toLocaleString('es-AR')} >> temp_ticket.txt
-echo ================================ >> temp_ticket.txt
-echo PAGO PROCESADO EXITOSAMENTE >> temp_ticket.txt
-echo Gracias por su pago >> temp_ticket.txt
-echo ${new Date().toLocaleString('es-AR')} >> temp_ticket.txt
-print temp_ticket.txt /D:"NPI Integration Driver"
-del temp_ticket.txt
-        `;
-
-        // Crear blob con comando batch
-        const blob = new Blob([comando], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-
-        // Crear enlace de descarga automática
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `imprimir_${factura}_${Date.now()}.bat`;
-        link.style.display = 'none';
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        URL.revokeObjectURL(url);
-
-        console.log('✅ Comando batch creado para impresión automática');
-
-        // Mostrar instrucciones rápidas
-        setTimeout(() => {
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #059669;
-                color: white;
-                padding: 15px;
-                border-radius: 8px;
-                z-index: 99999;
-                font-weight: bold;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            `;
-            toast.innerHTML =
-                '🖨️ Ejecuta el archivo .bat descargado para imprimir';
-            document.body.appendChild(toast);
-
-            setTimeout(() => {
-                try {
-                    document.body.removeChild(toast);
-                } catch (e) {}
-            }, 4000);
-        }, 500);
-
-        return true;
-    } catch (error) {
-        console.error('❌ Error en método spooler:', error);
-        throw error;
-    }
-}
-async function enviarAImpresoraNPI(comandoImpresion) {
-    try {
-        // Intentar envío directo al puerto estándar de impresoras
-        const response = await fetch('http://localhost:9100', {
+        // ✅ ENVÍO AL ENDPOINT DE IMPRESIÓN
+        const response = await fetch('/api/imprimir-ticket', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/octet-stream',
+                'Content-Type': 'application/json',
             },
-            body: comandoImpresion,
+            body: JSON.stringify(datosImpresion),
         });
 
         if (response.ok) {
+            const resultado = await response.json();
+            console.log('✅ Impresión exitosa desde backend:', resultado);
             return true;
         } else {
-            throw new Error('Puerto impresora no disponible');
+            console.log('❌ Backend no disponible, usando método alternativo');
+            return false;
         }
     } catch (error) {
-        // Intentar con puerto alternativo
-        try {
-            const response2 = await fetch(
-                'http://127.0.0.1:631/printers/NPI_Integration_Driver',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/vnd.cups-raw',
-                    },
-                    body: comandoImpresion,
-                }
-            );
-
-            if (response2.ok) {
-                return true;
-            }
-        } catch (error2) {
-            // Silencioso, pasar al siguiente método
-        }
-
-        throw new Error('No se pudo conectar directamente');
+        console.log('❌ Error conectando con backend:', error.message);
+        return false;
     }
 }
 
-// ===== CREAR ARCHIVO DE IMPRESIÓN AUTOMÁTICO =====
-async function crearArchivoImpresion(comandoImpresion, factura) {
-    try {
-        // Crear blob con datos de impresión
-        const blob = new Blob([comandoImpresion], {
-            type: 'application/octet-stream',
+// ===== MOSTRAR SOLUCIÓN DEFINITIVA PARA TAS =====
+async function mostrarSolucionTAS(datosTicket) {
+    return new Promise((resolve) => {
+        // Crear modal personalizado sin SweetAlert
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.9);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+        `;
+
+        modal.innerHTML = `
+            <div style="
+                background: linear-gradient(135deg, #059669, #047857);
+                color: white;
+                padding: 40px;
+                border-radius: 20px;
+                max-width: 600px;
+                text-align: center;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            ">
+                <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
+                <h2 style="font-size: 32px; margin: 0 0 20px 0;">¡Pago Exitoso!</h2>
+                <p style="font-size: 18px; margin-bottom: 30px;">Tu pago ha sido procesado correctamente</p>
+                
+                <div style="
+                    background: rgba(255,255,255,0.1);
+                    padding: 20px;
+                    border-radius: 12px;
+                    margin: 20px 0;
+                ">
+                    <h3 style="margin: 0 0 15px 0; color: #fef3c7;">🖨️ Para imprimir el comprobante:</h3>
+                    <div style="text-align: left; margin: 15px 0;">
+                        <p style="margin: 5px 0;">1. Presiona <strong>Ctrl + P</strong></p>
+                        <p style="margin: 5px 0;">2. Selecciona <strong>"NPI Integration Driver"</strong></p>
+                        <p style="margin: 5px 0;">3. Haz clic en <strong>"Imprimir"</strong></p>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <button id="imprimirAhora" style="
+                        background: #fbbf24;
+                        color: #000;
+                        border: none;
+                        padding: 15px 30px;
+                        font-size: 18px;
+                        font-weight: bold;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                    ">🖨️ IMPRIMIR AHORA</button>
+                    
+                    <button id="continuarSin" style="
+                        background: rgba(255,255,255,0.2);
+                        color: white;
+                        border: 2px solid rgba(255,255,255,0.3);
+                        padding: 15px 30px;
+                        font-size: 18px;
+                        font-weight: bold;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                    ">CONTINUAR SIN IMPRIMIR</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Agregar eventos a los botones
+        const btnImprimir = modal.querySelector('#imprimirAhora');
+        const btnContinuar = modal.querySelector('#continuarSin');
+
+        btnImprimir.addEventListener('click', () => {
+            // Crear contenido para impresión
+            crearPaginaImpresion(datosTicket);
+            // Ejecutar Ctrl+P automáticamente
+            setTimeout(() => {
+                if (navigator.platform.includes('Win')) {
+                    // Simular Ctrl+P en Windows
+                    document.dispatchEvent(
+                        new KeyboardEvent('keydown', {
+                            key: 'p',
+                            ctrlKey: true,
+                            bubbles: true,
+                        })
+                    );
+                } else {
+                    // Ejecutar print() como fallback
+                    window.print();
+                }
+            }, 500);
         });
 
-        // Crear URL del blob
-        const url = URL.createObjectURL(blob);
+        btnContinuar.addEventListener('click', () => {
+            document.body.removeChild(modal);
+            resolve();
+        });
 
-        // Crear enlace de descarga automática (se envía a cola de impresión)
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `comprobante_${factura}_${Date.now()}.prn`;
-        link.style.display = 'none';
+        // Hover effects
+        btnImprimir.addEventListener('mouseenter', () => {
+            btnImprimir.style.transform = 'scale(1.05)';
+            btnImprimir.style.background = '#f59e0b';
+        });
+        btnImprimir.addEventListener('mouseleave', () => {
+            btnImprimir.style.transform = 'scale(1)';
+            btnImprimir.style.background = '#fbbf24';
+        });
 
-        // Agregar al DOM y simular clic
-        document.body.appendChild(link);
-        link.click();
-
-        // Limpiar inmediatamente
-        setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }, 100);
-
-        console.log('✅ Archivo .prn creado y enviado a cola de impresión');
-        return true;
-    } catch (error) {
-        console.error('❌ Error creando archivo de impresión:', error);
-        throw error;
-    }
+        btnContinuar.addEventListener('mouseenter', () => {
+            btnContinuar.style.transform = 'scale(1.05)';
+            btnContinuar.style.background = 'rgba(255,255,255,0.3)';
+        });
+        btnContinuar.addEventListener('mouseleave', () => {
+            btnContinuar.style.transform = 'scale(1)';
+            btnContinuar.style.background = 'rgba(255,255,255,0.2)';
+        });
+    });
 }
 
-// ===== IFRAME COMPLETAMENTE OCULTO CON AUTO-PRINT =====
-async function imprimirConIframeOculto(datosTicket) {
-    try {
-        const {
-            cliente,
-            nis,
-            factura,
-            fecha,
-            importe,
-            vencimiento,
-            metodoPago,
-            transactionId,
-            fechaPago,
-        } = datosTicket;
-
-        // HTML ultra-optimizado para impresión silenciosa
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Comprobante</title>
-                <style>
-                    @page { 
-                        size: 80mm auto; 
-                        margin: 0; 
-                    }
-                    @media print {
-                        body {
-                            width: 80mm;
-                            font-family: 'Courier New', monospace;
-                            font-size: 10px;
-                            line-height: 1.2;
-                            margin: 0;
-                            padding: 2mm;
-                            color: #000;
-                            background: white;
-                        }
-                        .header { text-align: center; font-weight: bold; margin-bottom: 3mm; }
-                        .separator { border-top: 1px dashed #000; margin: 2mm 0; }
-                        .section { font-weight: bold; margin: 1mm 0; }
-                        .amount { 
-                            text-align: center; 
-                            font-size: 14px; 
-                            font-weight: bold; 
-                            margin: 3mm 0; 
-                            border: 1px solid #000; 
-                            padding: 2mm; 
-                        }
-                        .footer { text-align: center; margin-top: 3mm; }
-                    }
-                    @media screen {
-                        body { display: none; }
-                    }
-                </style>
-                <script>
-                    window.onload = function() {
-                        // Auto-imprimir inmediatamente sin espera
-                        window.print();
-                        // Auto-cerrar
-                        setTimeout(function() {
-                            window.close();
-                        }, 500);
-                    };
-                </script>
-            </head>
-            <body>
-                <div class="header">
-                    COOPERATIVA POPULAR<br>
-                    COMPROBANTE DE PAGO
-                </div>
-                <div class="separator"></div>
-                <div class="section">CLIENTE:</div>
-                <div>${cliente}</div>
-                <div>NIS: ${nis}</div>
-                <div class="separator"></div>
-                <div class="section">FACTURA:</div>
-                <div>N°: ${factura}</div>
-                <div>Venc: ${vencimiento}</div>
-                <div>Fecha: ${fecha}</div>
-                <div class="separator"></div>
-                <div class="section">PAGO:</div>
-                <div>${metodoPago}</div>
-                <div>${fechaPago}</div>
-                <div>ID: ${transactionId}</div>
-                <div class="separator"></div>
-                <div class="amount">
-                    IMPORTE PAGADO<br>
-                    $${parseFloat(importe).toLocaleString('es-AR')}
-                </div>
-                <div class="separator"></div>
-                <div class="footer">
-                    ✅ PAGO EXITOSO<br>
-                    ${new Date().toLocaleString('es-AR')}
-                </div>
-            </body>
-            </html>
-        `;
-
-        // Crear iframe COMPLETAMENTE invisible
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = `
-            position: absolute !important;
-            left: -99999px !important;
-            top: -99999px !important;
-            width: 1px !important;
-            height: 1px !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            border: none !important;
-            z-index: -99999 !important;
-            display: none !important;
-        `;
-
-        // Agregar al DOM
-        document.body.appendChild(iframe);
-
-        // Escribir contenido
-        const iframeDoc =
-            iframe.contentDocument || iframe.contentWindow.document;
-        iframeDoc.open();
-        iframeDoc.write(printContent);
-        iframeDoc.close();
-
-        // Ejecutar auto-print después de muy poco tiempo
-        setTimeout(() => {
-            try {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-                console.log('✅ Auto-print ejecutado desde iframe invisible');
-            } catch (e) {
-                console.log('❌ Error en auto-print iframe:', e.message);
-            }
-        }, 100);
-
-        // Limpiar iframe después de un tiempo
-        setTimeout(() => {
-            try {
-                document.body.removeChild(iframe);
-            } catch (e) {
-                console.log('ℹ️ Iframe ya removido');
-            }
-        }, 2000);
-
-        return true;
-    } catch (error) {
-        console.error('❌ Error en iframe oculto:', error);
-        throw error;
-    }
-}
-
-// ===== GENERAR COMANDO DIRECTO PARA IMPRESORA =====
-function generarComandoDirecto(datosTicket) {
+// ===== CREAR PÁGINA OPTIMIZADA PARA IMPRESIÓN =====
+function crearPaginaImpresion(datosTicket) {
     const {
         cliente,
         nis,
@@ -551,189 +207,150 @@ function generarComandoDirecto(datosTicket) {
         fechaPago,
     } = datosTicket;
 
-    // Comandos ESC/POS para impresora térmica
-    const ESC = '\x1B';
-    const GS = '\x1D';
-
-    const comando =
-        ESC +
-        '@' + // Reset
-        ESC +
-        'a' +
-        '\x01' + // Centrar
-        'COOPERATIVA POPULAR\n' +
-        'COMPROBANTE DE PAGO\n' +
-        '================================\n' +
-        ESC +
-        'a' +
-        '\x00' + // Alinear izquierda
-        'CLIENTE: ' +
-        cliente +
-        '\n' +
-        'NIS: ' +
-        nis +
-        '\n' +
-        '================================\n' +
-        'FACTURA: ' +
-        factura +
-        '\n' +
-        'VENCIMIENTO: ' +
-        vencimiento +
-        '\n' +
-        'FECHA VTO: ' +
-        fecha +
-        '\n' +
-        '================================\n' +
-        'METODO: ' +
-        metodoPago +
-        '\n' +
-        'FECHA: ' +
-        fechaPago +
-        '\n' +
-        'ID: ' +
-        transactionId +
-        '\n' +
-        '================================\n' +
-        ESC +
-        'a' +
-        '\x01' + // Centrar
-        'IMPORTE PAGADO\n' +
-        '$' +
-        parseFloat(importe).toLocaleString('es-AR') +
-        '\n' +
-        '================================\n' +
-        'PAGO PROCESADO EXITOSAMENTE\n' +
-        'Gracias por su pago\n\n' +
-        new Date().toLocaleString('es-AR') +
-        '\n' +
-        '\n\n\n' +
-        GS +
-        'V' +
-        'B' +
-        '\x00'; // Cortar papel
-
-    return new TextEncoder().encode(comando);
-}
-
-// ===== FUNCIÓN PRINCIPAL DE IMPRESIÓN DE TICKETS DE ERROR =====
-export async function imprimirTicketError(datosTicketError) {
-    try {
-        console.log('🖨️ Imprimiendo ticket de error automáticamente...');
-
-        // Generar y enviar comando de error
-        const comandoError = generarComandoError(datosTicketError);
-        await enviarAImpresoraNPI(comandoError);
-
-        console.log('✅ Ticket de error impreso automáticamente');
-        return true;
-    } catch (error) {
-        console.error('❌ Error imprimiendo ticket de error:', error);
-        return false;
+    // Limpiar cualquier contenido de impresión anterior
+    const existingPrintContent = document.querySelector('.tas-print-content');
+    if (existingPrintContent) {
+        existingPrintContent.remove();
     }
+
+    // Crear contenido optimizado para NPI Integration Driver
+    const printDiv = document.createElement('div');
+    printDiv.className = 'tas-print-content';
+    printDiv.style.cssText = 'position: absolute; left: -9999px; top: -9999px;';
+
+    printDiv.innerHTML = `
+        <div style="
+            width: 80mm;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.3;
+            margin: 0;
+            padding: 0;
+        ">
+            <div style="text-align: center; font-weight: bold; margin-bottom: 5mm;">
+                COOPERATIVA POPULAR<br>
+                COMPROBANTE DE PAGO
+            </div>
+            
+            <div style="border-top: 1px dashed #000; margin: 3mm 0;"></div>
+            
+            <div style="font-weight: bold;">CLIENTE:</div>
+            <div>${cliente}</div>
+            <div>NIS: ${nis}</div>
+            
+            <div style="border-top: 1px dashed #000; margin: 3mm 0;"></div>
+            
+            <div style="font-weight: bold;">FACTURA:</div>
+            <div>Número: ${factura}</div>
+            <div>Vencimiento: ${vencimiento}</div>
+            <div>Fecha Vto: ${fecha}</div>
+            
+            <div style="border-top: 1px dashed #000; margin: 3mm 0;"></div>
+            
+            <div style="font-weight: bold;">PAGO:</div>
+            <div>Método: ${metodoPago}</div>
+            <div>Fecha: ${fechaPago}</div>
+            <div>ID: ${transactionId}</div>
+            
+            <div style="border-top: 1px dashed #000; margin: 3mm 0;"></div>
+            
+            <div style="
+                text-align: center;
+                font-size: 16px;
+                font-weight: bold;
+                margin: 5mm 0;
+                border: 2px solid #000;
+                padding: 3mm;
+            ">
+                IMPORTE PAGADO<br>
+                $${parseFloat(importe).toLocaleString('es-AR')}
+            </div>
+            
+            <div style="border-top: 1px dashed #000; margin: 3mm 0;"></div>
+            
+            <div style="text-align: center; margin-top: 5mm;">
+                ✅ PAGO PROCESADO EXITOSAMENTE<br>
+                Gracias por su pago<br><br>
+                ${new Date().toLocaleString('es-AR')}
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(printDiv);
+
+    // Agregar estilos específicos para impresión
+    const existingStyle = document.querySelector('#tas-print-styles');
+    if (existingStyle) {
+        existingStyle.remove();
+    }
+
+    const style = document.createElement('style');
+    style.id = 'tas-print-styles';
+    style.textContent = `
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .tas-print-content,
+            .tas-print-content * {
+                visibility: visible;
+            }
+            .tas-print-content {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    console.log('✅ Página de impresión preparada para NPI Integration Driver');
 }
 
-// ===== GENERAR COMANDO DE ERROR =====
-function generarComandoError(datosTicketError) {
-    const {
-        cliente,
-        nis,
-        factura,
-        fecha,
-        importe,
-        vencimiento,
-        metodoPago,
-        fechaIntento,
-        razonFallo,
-        referencia,
-    } = datosTicketError;
-
-    const ESC = '\x1B';
-    const GS = '\x1D';
-
-    const comando =
-        ESC +
-        '@' + // Reset
-        ESC +
-        'a' +
-        '\x01' + // Centrar
-        'COOPERATIVA POPULAR\n' +
-        'COMPROBANTE DE ERROR\n' +
-        '================================\n' +
-        ESC +
-        'a' +
-        '\x00' + // Alinear izquierda
-        'CLIENTE: ' +
-        cliente +
-        '\n' +
-        'NIS: ' +
-        nis +
-        '\n' +
-        '================================\n' +
-        'FACTURA: ' +
-        factura +
-        '\n' +
-        'VENCIMIENTO: ' +
-        vencimiento +
-        '\n' +
-        'FECHA VTO: ' +
-        fecha +
-        '\n' +
-        '================================\n' +
-        'INTENTO: ' +
-        metodoPago +
-        '\n' +
-        'FECHA: ' +
-        fechaIntento +
-        '\n' +
-        'REF: ' +
-        referencia +
-        '\n' +
-        '================================\n' +
-        ESC +
-        'a' +
-        '\x01' + // Centrar
-        'IMPORTE INTENTADO\n' +
-        '$' +
-        parseFloat(importe).toLocaleString('es-AR') +
-        '\n' +
-        '================================\n' +
-        'ESTADO: FALLIDO\n' +
-        'RAZON: ' +
-        razonFallo +
-        '\n' +
-        '================================\n' +
-        'EL PAGO NO FUE PROCESADO\n' +
-        'Puede intentar nuevamente\n\n' +
-        new Date().toLocaleString('es-AR') +
-        '\n' +
-        '\n\n\n' +
-        GS +
-        'V' +
-        'B' +
-        '\x00'; // Cortar papel
-
-    return new TextEncoder().encode(comando);
-}
-
-// ===== NOTIFICACIÓN MUY DISCRETA PARA TAS =====
+// ===== NOTIFICACIÓN DISCRETA =====
 function mostrarNotificacionTAS(mensaje, tipo = 'success') {
-    const Toast = Swal.mixin({
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 1500, // Muy corto
-        timerProgressBar: false,
-        background: tipo === 'success' ? '#059669' : '#dc2626',
-        color: 'white',
-        width: '300px',
-    });
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${tipo === 'success' ? '#059669' : '#dc2626'};
+        color: white;
+        padding: 15px 25px;
+        border-radius: 8px;
+        z-index: 999999;
+        font-weight: bold;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out;
+    `;
+    toast.textContent = mensaje;
 
-    Toast.fire({
-        title: mensaje,
-    });
+    // Agregar animación
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        try {
+            document.body.removeChild(toast);
+            document.head.removeChild(style);
+        } catch (e) {}
+    }, 3000);
 }
 
-// ===== FUNCIÓN PARA PREPARAR DATOS DEL TICKET DE ÉXITO =====
+// ===== FUNCIÓN PARA PREPARAR DATOS DEL TICKET =====
 export function prepararDatosTicket(
     factura,
     nis,
@@ -767,7 +384,13 @@ export function prepararDatosTicket(
     };
 }
 
-// ===== FUNCIÓN PARA PREPARAR DATOS DEL TICKET DE ERROR =====
+// ===== FUNCIÓN PARA TICKETS DE ERROR =====
+export async function imprimirTicketError(datosTicketError) {
+    console.log('🖨️ Ticket de error - usando mismo sistema que éxito');
+    return await imprimirTicketDesdeNavegador(datosTicketError);
+}
+
+// ===== FUNCIÓN PARA PREPARAR DATOS DE ERROR =====
 export function prepararDatosTicketError(
     factura,
     nis,
@@ -796,7 +419,7 @@ export function prepararDatosTicketError(
     };
 }
 
-// ===== FUNCIÓN PARA TESTING MANUAL =====
+// ===== TESTING =====
 export async function testImpresion() {
     const datosTest = {
         cliente: 'CLIENTE TEST',
@@ -810,11 +433,9 @@ export async function testImpresion() {
         fechaPago: new Date().toLocaleString('es-AR'),
     };
 
-    console.log('🧪 Test de impresión 100% automática...');
     await imprimirTicketDesdeNavegador(datosTest);
 }
 
-// ===== FUNCIÓN PARA TESTING DE TICKETS DE ERROR =====
 export async function testImpresionError() {
     const datosTestError = {
         cliente: 'CLIENTE TEST',
