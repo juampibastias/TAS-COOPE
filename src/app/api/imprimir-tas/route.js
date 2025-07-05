@@ -1,10 +1,7 @@
-// src/api/imprimir-tas/route.js
-export default async function handler(req, res) {
-    if (req.method !== 'POST')
-        return res.status(405).end('Método no permitido');
-
+// src/app/api/imprimir-tas/route.js - Next.js 13+ App Router
+export async function POST(request) {
     try {
-        const { ipTAS, datos } = req.body;
+        const { ipTAS, datos } = await request.json();
 
         console.log(`🖨️ Conectando a TAS: http://${ipTAS}:9100/imprimir`);
         console.log('📄 Datos del ticket:', datos);
@@ -22,13 +19,34 @@ export default async function handler(req, res) {
         const data = await respuesta.json();
         console.log('✅ Respuesta exitosa del TAS:', data);
 
-        res.status(200).json(data);
+        return Response.json({
+            success: true,
+            data: data,
+            mensaje: 'Impresión enviada correctamente al TAS',
+        });
     } catch (error) {
         console.error('❌ Error al conectar con TAS:', error.message);
-        res.status(500).json({
-            error: 'Fallo al imprimir en TAS',
-            detalle: error.message,
-            ipTAS: req.body.ipTAS,
-        });
+
+        return Response.json(
+            {
+                success: false,
+                error: 'Fallo al imprimir en TAS',
+                detalle: error.message,
+                ipTAS: 'Error de conexión',
+            },
+            { status: 500 }
+        );
     }
+}
+
+// Manejar OPTIONS para CORS
+export async function OPTIONS() {
+    return new Response(null, {
+        status: 200,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        },
+    });
 }
