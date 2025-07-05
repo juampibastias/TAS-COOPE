@@ -227,52 +227,115 @@ async function mostrarSolucionTAS(datosTicket) {
 // ===== EJECUTAR IMPRESIÓN COMPLETA AUTOMÁTICA =====
 async function ejecutarImpresionCompleta(datosTicket) {
     try {
-        console.log('🖨️ Ejecutando impresión completa optimizada...');
+        console.log('🖨️ Ejecutando impresión completa automática...');
 
+        // ✅ PASO 1: Preparar contenido optimizado
+        crearPaginaImpresion(datosTicket);
+
+        // ✅ PASO 2: Crear iframe temporal visible para impresión
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = `
+            position: fixed !important;
+            left: 50% !important;
+            top: 50% !important;
+            width: 400px !important;
+            height: 600px !important;
+            transform: translate(-50%, -50%) !important;
+            border: 3px solid #059669 !important;
+            border-radius: 12px !important;
+            z-index: 999998 !important;
+            background: white !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
+        `;
+
+        // ✅ PASO 3: Crear overlay de procesamiento
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(0,0,0,0.8) !important;
+            z-index: 999997 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: white !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            flex-direction: column !important;
+        `;
+
+        overlay.innerHTML = `
+            <div style="
+                position: absolute;
+                top: 20%;
+                text-align: center;
+                background: #059669;
+                padding: 25px 40px;
+                border-radius: 15px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            ">
+                <div style="font-size: 48px; margin-bottom: 15px; animation: pulse 1.5s infinite;">🖨️</div>
+                <div style="font-size: 20px; margin-bottom: 10px;">Preparando impresión...</div>
+                <div style="font-size: 14px; opacity: 0.8;">Se abrirá el diálogo automáticamente</div>
+            </div>
+        `;
+
+        // ✅ PASO 4: Agregar elementos al DOM
+        document.body.appendChild(overlay);
+        document.body.appendChild(iframe);
+
+        // ✅ PASO 5: Preparar contenido en iframe
+        const contenidoImpresion = generarHTMLImpresion(datosTicket);
+        const iframeDoc =
+            iframe.contentDocument || iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(contenidoImpresion);
+        iframeDoc.close();
+
+        // ✅ PASO 6: Ejecutar impresión automática después de breve pausa
         return new Promise((resolve) => {
-            // ✅ Paso 1: Generar el HTML para imprimir
-            const contenidoHTML = generarHTMLImpresion(datosTicket);
+            setTimeout(() => {
+                try {
+                    // Foco en iframe y ejecutar print
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
 
-            // ✅ Paso 2: Crear iframe oculto
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'display: none;';
-            document.body.appendChild(iframe);
+                    console.log(
+                        '✅ window.print() ejecutado automáticamente desde iframe'
+                    );
 
-            // ✅ Paso 3: Esperar a que cargue el contenido del iframe
-            iframe.onload = () => {
-                setTimeout(() => {
+                    // ✅ PASO 7: Limpiar después de 4 segundos
+                    setTimeout(() => {
+                        try {
+                            document.body.removeChild(iframe);
+                            document.body.removeChild(overlay);
+                        } catch (e) {
+                            console.log('ℹ️ Elementos ya removidos');
+                        }
+                        resolve(true);
+                    }, 4000);
+                } catch (error) {
+                    console.error(
+                        '❌ Error ejecutando print automático:',
+                        error
+                    );
                     try {
-                        // Ejecutar impresión silenciosa
-                        iframe.contentWindow.print();
-                        console.log('✅ Impresión disparada silenciosamente');
-
-                        // ✅ Paso 4: Eliminar el iframe luego de imprimir
-                        setTimeout(() => {
-                            iframe.remove();
-                            resolve(true);
-                        }, 3000); // Tiempo para que la cola de impresión se dispare correctamente
-                    } catch (error) {
-                        console.error(
-                            '❌ Error imprimiendo desde iframe:',
-                            error
-                        );
-                        iframe.remove();
-                        resolve(false);
-                    }
-                }, 500); // Pequeña espera para asegurar render completo
-            };
-
-            // ✅ Paso 5: Inyectar HTML en el iframe
-            const doc = iframe.contentWindow.document;
-            doc.open();
-            doc.write(contenidoHTML);
-            doc.close();
+                        document.body.removeChild(iframe);
+                        document.body.removeChild(overlay);
+                    } catch (e) {}
+                    resolve(false);
+                }
+            }, 1500); // Pausa de 1.5 segundos para que se vea el overlay
         });
     } catch (error) {
-        console.error('❌ Error general en impresión:', error);
+        console.error('❌ Error en impresión completa:', error);
         return false;
     }
 }
+
 
 
 // ===== GENERAR HTML OPTIMIZADO PARA IMPRESIÓN =====
