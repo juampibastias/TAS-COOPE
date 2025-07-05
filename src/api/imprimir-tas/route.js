@@ -6,10 +6,8 @@ export default async function handler(req, res) {
     try {
         const { ipTAS, datos } = req.body;
 
-        console.log(
-            `🖨️ Enviando impresión a TAS: http://${ipTAS}:9100/imprimir`
-        );
-        console.log('📄 Datos:', datos);
+        console.log(`🖨️ Conectando a TAS: http://${ipTAS}:9100/imprimir`);
+        console.log('📄 Datos del ticket:', datos);
 
         const respuesta = await fetch(`http://${ipTAS}:9100/imprimir`, {
             method: 'POST',
@@ -22,11 +20,11 @@ export default async function handler(req, res) {
         }
 
         const data = await respuesta.json();
-        console.log('✅ Respuesta del TAS:', data);
+        console.log('✅ Respuesta exitosa del TAS:', data);
 
         res.status(200).json(data);
     } catch (error) {
-        console.error('❌ Error al imprimir en TAS:', error.message);
+        console.error('❌ Error al conectar con TAS:', error.message);
         res.status(500).json({
             error: 'Fallo al imprimir en TAS',
             detalle: error.message,
