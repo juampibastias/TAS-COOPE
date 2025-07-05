@@ -1,7 +1,7 @@
 import Swal from 'sweetalert2';
 import { processPayment } from '../services/paymentService';
 import { downloadFactura, isVencido } from '../services/facturaService';
-
+import { useEffect, useState } from 'react';
 // Función corregida para calcular importes y estados
 function calcularImportesFactura(factura) {
     const estado = factura.ESTADO;
@@ -347,6 +347,17 @@ function PaymentModal({ factura, nis }) {
     });
 }
 
+// Función para verificar si la impresora NPI está configurada
+function estaImpresoraConfigurada() {
+    try {
+        const config = localStorage.getItem('tas_printer_npi_configured');
+        return config === 'true';
+    } catch (error) {
+        return window.tasPrinterConfigured || false;
+    }
+}
+
+
 // Función para calcular columnas dinámicamente
 function calcularColumnasGrid(cantidadFacturas) {
     if (cantidadFacturas <= 3) return 'grid-cols-3';
@@ -583,6 +594,13 @@ async function probarImpresoraNPI() {
 
 // Componente principal con grid auto-ajustable
 export default function TASFacturasGrid({ facturasImpagas, nis }) {
+    const [mostrarBotonConfig, setMostrarBotonConfig] = useState(false);
+
+    useEffect(() => {
+        const estaConfigurada = estaImpresoraConfigurada();
+        setMostrarBotonConfig(!estaConfigurada);
+    }, []);
+
     if (!facturasImpagas.length) {
         return (
             <div className='bg-green-800/30 p-6 rounded-xl text-center'>
@@ -653,14 +671,16 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
             )}
 
             {/* BOTÓN DE CONFIGURACIÓN NPI INTEGRATION DRIVER */}
-            {/* <div className='fixed top-4 right-4 z-50'>
-                <button
-                    onClick={configurarImpresoraNPI}
-                    className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105'
-                >
-                    🖨️ CONFIGURAR IMPRESORA NPI
-                </button>
-            </div> */}
+            {mostrarBotonConfig && (
+                <div className='fixed top-4 right-4 z-50'>
+                    <button
+                        onClick={configurarImpresoraNPI}
+                        className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105'
+                    >
+                        🖨️ CONFIGURAR IMPRESORA NPI
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
