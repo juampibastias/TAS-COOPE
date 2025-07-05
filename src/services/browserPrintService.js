@@ -279,8 +279,191 @@ async function imprimirConNPIDriver(datosTicket) {
         throw error;
     }
 }
-    
+    try {
+        console.log('🖨️ Imprimiendo con NPI Integration Driver...');
 
+        const {
+            cliente,
+            nis,
+            factura,
+            fecha,
+            importe,
+            vencimiento,
+            metodoPago,
+            transactionId,
+            fechaPago,
+        } = datosTicket;
+
+        // HTML optimizado para impresoras térmicas con NPI Driver
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Comprobante de Pago</title>
+                <style>
+                    @page {
+                        size: 80mm auto;
+                        margin: 0;
+                    }
+                    
+                    @media print {
+                        body {
+                            width: 80mm;
+                            font-family: 'Courier New', monospace;
+                            font-size: 11px;
+                            line-height: 1.3;
+                            margin: 0;
+                            padding: 3mm;
+                            color: #000;
+                        }
+                        
+                        .header {
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 14px;
+                            margin-bottom: 4mm;
+                        }
+                        
+                        .separator {
+                            border-top: 1px dashed #000;
+                            margin: 3mm 0;
+                        }
+                        
+                        .section-title {
+                            font-weight: bold;
+                            text-decoration: underline;
+                            margin: 2mm 0 1mm 0;
+                        }
+                        
+                        .amount {
+                            text-align: center;
+                            font-size: 16px;
+                            font-weight: bold;
+                            margin: 4mm 0;
+                            border: 2px solid #000;
+                            padding: 3mm;
+                        }
+                        
+                        .footer {
+                            text-align: center;
+                            margin-top: 4mm;
+                            font-weight: bold;
+                        }
+                        
+                        .success {
+                            font-weight: bold;
+                        }
+                    }
+                    
+                    @media screen {
+                        body {
+                            width: 350px;
+                            font-family: 'Courier New', monospace;
+                            font-size: 12px;
+                            margin: 20px;
+                            padding: 15px;
+                            border: 1px solid #ccc;
+                            background: white;
+                        }
+                    }
+                </style>
+                <script>
+                    window.onload = function() {
+                        // Auto-imprimir después de cargar
+                        setTimeout(function() {
+                            window.print();
+                        }, 500);
+                    };
+                </script>
+            </head>
+            <body>
+                <div class="header">
+                    COOPERATIVA POPULAR<br>
+                    COMPROBANTE DE PAGO
+                </div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">CLIENTE:</div>
+                <div>${cliente}</div>
+                <div>NIS: ${nis}</div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">FACTURA:</div>
+                <div>Numero: ${factura}</div>
+                <div>Vencimiento: ${vencimiento}</div>
+                <div>Fecha Vto: ${fecha}</div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">PAGO:</div>
+                <div>Metodo: ${metodoPago}</div>
+                <div>Fecha: ${fechaPago}</div>
+                <div>ID: ${transactionId}</div>
+                
+                <div class="separator"></div>
+                
+                <div class="amount success">
+                    IMPORTE PAGADO<br>
+                    $${parseFloat(importe).toLocaleString('es-AR')}
+                </div>
+                
+                <div class="separator"></div>
+                
+                <div class="footer success">
+                    ✅ PAGO PROCESADO EXITOSAMENTE<br>
+                    Gracias por su pago<br><br>
+                    ${new Date().toLocaleString('es-AR')}
+                </div>
+            </body>
+            </html>
+        `;
+
+        // Abrir ventana optimizada para NPI Driver
+        const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+        
+        if (!printWindow) {
+            throw new Error('No se pudo abrir ventana de impresión');
+        }
+
+        // Escribir contenido y configurar auto-impresión
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+
+        // Esperar a que cargue y verificar impresión
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                try {
+                    printWindow.close();
+                } catch (e) {}
+                reject(new Error('Timeout esperando impresión'));
+            }, 10000); // 10 segundos timeout
+
+            // Verificar cuando se ejecute la impresión
+            setTimeout(() => {
+                clearTimeout(timeout);
+                console.log('✅ Ventana de impresión configurada para NPI Driver');
+                
+                // Cerrar ventana después de un tiempo
+                setTimeout(() => {
+                    try {
+                        printWindow.close();
+                    } catch (e) {
+                        console.log('ℹ️ Ventana ya cerrada');
+                    }
+                }, 2000);
+                
+                resolve(true);
+            }, 1000);
+        });
+
+    } catch (error) {
+        console.error('❌ Error en impresión con NPI Driver:', error);
+        throw error;
+    }
+}
 
 // ===== FUNCIÓN PRINCIPAL DE IMPRESIÓN DE TICKETS DE ERROR =====
 export async function imprimirTicketError(datosTicketError) {
@@ -449,31 +632,37 @@ export async function imprimirTicketError(datosTicketError) {
 // ===== MOSTRAR INSTRUCCIONES ESPECÍFICAS PARA NPI =====
 async function mostrarInstruccionesNPI(datosTicket, errorMsg) {
     return Swal.fire({
-        title: '🖨️ NPI Integration Driver',
+        title: '🖨️ Configuración de Impresora',
         html: `
             <div style="text-align: left; padding: 20px;">
                 <h3 style="color: #059669; margin-bottom: 15px;">✅ El pago fue procesado exitosamente</h3>
                 
                 <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #f59e0b;">
-                    <p style="margin: 0;"><strong>⚠️ La impresora requiere configuración manual</strong></p>
+                    <p style="margin: 0;"><strong>⚠️ La impresora requiere configuración</strong></p>
                 </div>
                 
-                <p><strong>Para imprimir automáticamente en próximos pagos:</strong></p>
+                <p><strong>Para habilitar impresión automática:</strong></p>
                 <ol style="margin: 15px 0; padding-left: 20px;">
-                    <li>Haz clic en el botón "🖨️ CONFIGURAR IMPRESORA NPI"</li>
+                    <li>Haz clic en el botón <strong>"🖨️ CONFIGURAR IMPRESORA NPI"</strong></li>
                     <li>Sigue las instrucciones de configuración</li>
                     <li>Selecciona "NPI Integration Driver" cuando aparezca</li>
+                    <li>Confirma que la impresión funciona</li>
                 </ol>
                 
                 <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
                     <p style="margin: 0; font-size: 14px;">
-                        <strong>💡 Una vez configurado:</strong> Todos los pagos futuros imprimirán automáticamente
+                        <strong>💡 Una vez configurado:</strong> Todos los pagos futuros imprimirán automáticamente sin diálogos
                     </p>
                 </div>
                 
-                <p style="font-size: 12px; color: #666; margin-top: 15px;">
-                    Error técnico: ${errorMsg}
-                </p>
+                ${errorMsg && errorMsg.includes('abrir ventana') ? `
+                    <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ef4444;">
+                        <p style="margin: 0; font-size: 14px;">
+                            <strong>🚫 Chrome está bloqueando ventanas emergentes.</strong><br>
+                            Después de configurar, la impresión usará métodos alternativos que no requieren popups.
+                        </p>
+                    </div>
+                ` : ''}
             </div>
         `,
         confirmButtonText: 'Entendido',
