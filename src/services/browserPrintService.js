@@ -2,18 +2,25 @@
 
 import Swal from 'sweetalert2';
 
+// ===== VERIFICAR ENTORNO CLIENTE =====
+const isClient = typeof window !== 'undefined';
+
 // ===== CONFIGURACIÓN GLOBAL TAS =====
 const TAS_CONFIG = {
     // Flag para indicar que es un entorno TAS
     esTAS:
-        localStorage.getItem('TAS_MODE') === 'true' ||
-        window.location.search.includes('tas=true'),
+        isClient &&
+        (localStorage.getItem('TAS_MODE') === 'true' ||
+            window.location.search.includes('tas=true')),
 
     // Configuración de impresora guardada
-    impresoraConfigurada: localStorage.getItem('tas-impresora-ok') === 'true',
+    impresoraConfigurada:
+        isClient && localStorage.getItem('tas-impresora-ok') === 'true',
 
     // Modo de impresión (auto, manual, deshabilitado)
-    modoImpresion: localStorage.getItem('tas-modo-impresion') || 'auto',
+    modoImpresion: isClient
+        ? localStorage.getItem('tas-modo-impresion') || 'auto'
+        : 'auto',
 };
 
 // ===== FUNCIÓN PRINCIPAL - IMPRESIÓN TAS REAL =====
@@ -23,6 +30,12 @@ export async function imprimirTicketDesdeNavegador(datosTicket) {
             '🖨️ Iniciando impresión TAS (cliente con impresora local)...',
             datosTicket
         );
+
+        // ✅ VERIFICAR SI ESTAMOS EN EL CLIENTE
+        if (!isClient) {
+            console.log('⚠️ Función llamada en el servidor - ignorando');
+            return false;
+        }
 
         // ✅ VERIFICAR SI ES ENTORNO TAS
         if (!TAS_CONFIG.esTAS) {
@@ -171,13 +184,15 @@ async function configurarImpresoraTASPrimeraVez(datosTicket) {
 
                 if (exitoso) {
                     // Guardar configuración TAS
-                    localStorage.setItem('TAS_MODE', 'true');
-                    localStorage.setItem('tas-impresora-ok', 'true');
-                    localStorage.setItem('tas-modo-impresion', 'auto');
-                    localStorage.setItem(
-                        'tas-config-fecha',
-                        new Date().toISOString()
-                    );
+                    if (isClient) {
+                        localStorage.setItem('TAS_MODE', 'true');
+                        localStorage.setItem('tas-impresora-ok', 'true');
+                        localStorage.setItem('tas-modo-impresion', 'auto');
+                        localStorage.setItem(
+                            'tas-config-fecha',
+                            new Date().toISOString()
+                        );
+                    }
 
                     TAS_CONFIG.esTAS = true;
                     TAS_CONFIG.impresoraConfigurada = true;
@@ -209,9 +224,11 @@ async function configurarImpresoraTASPrimeraVez(datosTicket) {
 
         btnManual.addEventListener('click', () => {
             // Configurar modo manual
-            localStorage.setItem('TAS_MODE', 'true');
-            localStorage.setItem('tas-impresora-ok', 'true');
-            localStorage.setItem('tas-modo-impresion', 'manual');
+            if (isClient) {
+                localStorage.setItem('TAS_MODE', 'true');
+                localStorage.setItem('tas-impresora-ok', 'true');
+                localStorage.setItem('tas-modo-impresion', 'manual');
+            }
 
             TAS_CONFIG.esTAS = true;
             TAS_CONFIG.impresoraConfigurada = true;
@@ -1057,16 +1074,27 @@ export function prepararDatosTicketError(
 
 // Habilitar modo TAS manualmente
 export function habilitarModoTAS() {
+    if (!isClient) {
+        console.warn('⚠️ No se puede habilitar modo TAS en el servidor');
+        return false;
+    }
+
     localStorage.setItem('TAS_MODE', 'true');
     localStorage.setItem('tas-modo-impresion', 'auto');
     TAS_CONFIG.esTAS = true;
     TAS_CONFIG.modoImpresion = 'auto';
     console.log('🏪 Modo TAS habilitado');
     mostrarNotificacionTAS('🏪 Modo TAS habilitado', 'success');
+    return true;
 }
 
 // Deshabilitar modo TAS
 export function deshabilitarModoTAS() {
+    if (!isClient) {
+        console.warn('⚠️ No se puede deshabilitar modo TAS en el servidor');
+        return false;
+    }
+
     localStorage.removeItem('TAS_MODE');
     localStorage.removeItem('tas-impresora-ok');
     localStorage.removeItem('tas-modo-impresion');
@@ -1076,19 +1104,35 @@ export function deshabilitarModoTAS() {
     TAS_CONFIG.modoImpresion = 'auto';
     console.log('🖥️ Modo TAS deshabilitado');
     mostrarNotificacionTAS('🖥️ Modo TAS deshabilitado', 'info');
+    return true;
 }
 
 // Resetear configuración TAS
 export function resetearConfiguracionTAS() {
+    if (!isClient) {
+        console.warn(
+            '⚠️ No se puede resetear configuración TAS en el servidor'
+        );
+        return false;
+    }
+
     localStorage.removeItem('tas-impresora-ok');
     localStorage.removeItem('tas-config-fecha');
     TAS_CONFIG.impresoraConfigurada = false;
     console.log('🔄 Configuración TAS reseteada');
     mostrarNotificacionTAS('🔄 Configuración TAS reseteada', 'warning');
+    return true;
 }
 
 // Verificar estado TAS
 export function verificarEstadoTAS() {
+    if (!isClient) {
+        return {
+            error: 'No disponible en el servidor',
+            isServer: true,
+        };
+    }
+
     const estado = {
         esTAS: TAS_CONFIG.esTAS,
         configurado: TAS_CONFIG.impresoraConfigurada,
@@ -1104,12 +1148,19 @@ export function verificarEstadoTAS() {
 
 // Cambiar modo de impresión
 export function cambiarModoImpresion(nuevoModo) {
+    if (!isClient) {
+        console.warn('⚠️ No se puede cambiar modo de impresión en el servidor');
+        return false;
+    }
+
     if (['auto', 'manual', 'deshabilitado'].includes(nuevoModo)) {
         localStorage.setItem('tas-modo-impresion', nuevoModo);
         TAS_CONFIG.modoImpresion = nuevoModo;
         console.log(`🔧 Modo de impresión cambiado a: ${nuevoModo}`);
         mostrarNotificacionTAS(`🔧 Modo: ${nuevoModo}`, 'info');
+        return true;
     }
+    return false;
 }
 
 // Testing
