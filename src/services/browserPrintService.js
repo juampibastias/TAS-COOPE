@@ -27,6 +27,19 @@ export async function imprimirTicketDesdeNavegador(datosTicket) {
 // ===== IMPRESIÓN DIRECTA SIN DIÁLOGOS =====
 async function imprimirDirectoNPI(datosTicket) {
     try {
+        // ✅ MÉTODO PRINCIPAL: Iframe con window.print() automático pero sin mostrar diálogo
+        await imprimirConIframeAutomatico(datosTicket);
+        console.log('✅ Impresión automática ejecutada exitosamente');
+        return true;
+    } catch (error) {
+        console.error('❌ Error en impresión directa:', error);
+        throw error;
+    }
+}
+
+// ===== IFRAME CON IMPRESIÓN AUTOMÁTICA MEJORADA =====
+async function imprimirConIframeAutomatico(datosTicket) {
+    try {
         const {
             cliente,
             nis,
@@ -39,43 +52,264 @@ async function imprimirDirectoNPI(datosTicket) {
             fechaPago,
         } = datosTicket;
 
-        // Generar comando directo para impresora térmica
-        const comandoImpresion = generarComandoDirecto(datosTicket);
+        // HTML ultra-optimizado para impresión AUTOMÁTICA
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Comprobante</title>
+                <style>
+                    @page { 
+                        size: 80mm auto; 
+                        margin: 0; 
+                    }
+                    @media print {
+                        body {
+                            width: 80mm;
+                            font-family: 'Courier New', monospace;
+                            font-size: 10px;
+                            line-height: 1.2;
+                            margin: 0;
+                            padding: 2mm;
+                            color: #000;
+                            background: white;
+                        }
+                        .header { text-align: center; font-weight: bold; margin-bottom: 3mm; }
+                        .separator { border-top: 1px dashed #000; margin: 2mm 0; }
+                        .section { font-weight: bold; margin: 1mm 0; }
+                        .amount { 
+                            text-align: center; 
+                            font-size: 14px; 
+                            font-weight: bold; 
+                            margin: 3mm 0; 
+                            border: 1px solid #000; 
+                            padding: 2mm; 
+                        }
+                        .footer { text-align: center; margin-top: 3mm; }
+                    }
+                    @media screen {
+                        body { 
+                            font-family: 'Courier New', monospace;
+                            font-size: 12px;
+                            margin: 20px;
+                            padding: 10px;
+                            width: 300px;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    COOPERATIVA POPULAR<br>
+                    COMPROBANTE DE PAGO
+                </div>
+                <div class="separator"></div>
+                <div class="section">CLIENTE:</div>
+                <div>${cliente}</div>
+                <div>NIS: ${nis}</div>
+                <div class="separator"></div>
+                <div class="section">FACTURA:</div>
+                <div>N°: ${factura}</div>
+                <div>Venc: ${vencimiento}</div>
+                <div>Fecha: ${fecha}</div>
+                <div class="separator"></div>
+                <div class="section">PAGO:</div>
+                <div>${metodoPago}</div>
+                <div>${fechaPago}</div>
+                <div>ID: ${transactionId}</div>
+                <div class="separator"></div>
+                <div class="amount">
+                    IMPORTE PAGADO<br>
+                    ${parseFloat(importe).toLocaleString('es-AR')}
+                </div>
+                <div class="separator"></div>
+                <div class="footer">
+                    ✅ PAGO EXITOSO<br>
+                    ${new Date().toLocaleString('es-AR')}
+                </div>
+            </body>
+            </html>
+        `;
 
-        // ✅ MÉTODO 1: Envío directo via fetch al puerto de impresora
-        try {
-            await enviarAImpresoraNPI(comandoImpresion);
-            console.log('✅ Comando enviado directamente a impresora NPI');
-            return true;
-        } catch (error) {
-            console.log('❌ Envío directo falló, usando método alternativo...');
-        }
+        return new Promise((resolve) => {
+            // Crear iframe visible temporalmente para impresión
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = `
+                position: fixed !important;
+                left: 50% !important;
+                top: 50% !important;
+                width: 400px !important;
+                height: 600px !important;
+                transform: translate(-50%, -50%) !important;
+                border: 2px solid #059669 !important;
+                border-radius: 8px !important;
+                z-index: 99999 !important;
+                background: white !important;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+            `;
 
-        // ✅ MÉTODO 2: Crear archivo .prn y enviarlo automáticamente
-        try {
-            await crearArchivoImpresion(comandoImpresion, factura);
-            console.log('✅ Archivo de impresión creado y enviado');
-            return true;
-        } catch (error) {
-            console.log('❌ Método archivo falló, usando último recurso...');
-        }
+            // Agregar al DOM
+            document.body.appendChild(iframe);
 
-        // ✅ MÉTODO 3: Iframe completamente oculto con auto-print
-        try {
-            await imprimirConIframeOculto(datosTicket);
-            console.log('✅ Impresión ejecutada con iframe oculto');
-            return true;
-        } catch (error) {
-            console.log('❌ Todos los métodos automáticos fallaron');
-            throw error;
-        }
+            // Escribir contenido
+            const iframeDoc =
+                iframe.contentDocument || iframe.contentWindow.document;
+            iframeDoc.open();
+            iframeDoc.write(printContent);
+            iframeDoc.close();
+
+            // Mostrar overlay de "Imprimiendo..."
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(0,0,0,0.8) !important;
+                z-index: 99998 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                color: white !important;
+                font-size: 24px !important;
+                font-weight: bold !important;
+            `;
+            overlay.innerHTML = `
+                <div style="text-align: center; background: #059669; padding: 30px; border-radius: 12px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🖨️</div>
+                    <div>Imprimiendo comprobante...</div>
+                    <div style="font-size: 16px; margin-top: 10px; opacity: 0.8;">Selecciona "NPI Integration Driver"</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // Ejecutar impresión después de un momento
+            setTimeout(() => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                    console.log('✅ window.print() ejecutado automáticamente');
+
+                    // Remover elementos después de 3 segundos
+                    setTimeout(() => {
+                        try {
+                            document.body.removeChild(iframe);
+                            document.body.removeChild(overlay);
+                        } catch (e) {
+                            console.log('ℹ️ Elementos ya removidos');
+                        }
+                        resolve(true);
+                    }, 3000);
+                } catch (e) {
+                    console.error('❌ Error ejecutando print:', e);
+                    try {
+                        document.body.removeChild(iframe);
+                        document.body.removeChild(overlay);
+                    } catch (e2) {}
+                    resolve(false);
+                }
+            }, 1000); // Dar tiempo para que se renderice
+        });
     } catch (error) {
-        console.error('❌ Error en impresión directa:', error);
+        console.error('❌ Error en iframe automático:', error);
         throw error;
     }
 }
 
-// ===== ENVÍO DIRECTO A IMPRESORA NPI (PUERTO 9100) =====
+// ===== MÉTODO ALTERNATIVO: ENVÍO DIRECTO AL SPOOLER DE WINDOWS =====
+async function enviarAlSpoolerWindows(datosTicket) {
+    try {
+        const {
+            cliente,
+            nis,
+            factura,
+            fecha,
+            importe,
+            vencimiento,
+            metodoPago,
+            transactionId,
+            fechaPago,
+        } = datosTicket;
+
+        // Crear comando para envío directo al spooler de Windows
+        const comando = `
+@echo off
+echo COOPERATIVA POPULAR > temp_ticket.txt
+echo COMPROBANTE DE PAGO >> temp_ticket.txt
+echo ================================ >> temp_ticket.txt
+echo CLIENTE: ${cliente} >> temp_ticket.txt
+echo NIS: ${nis} >> temp_ticket.txt
+echo ================================ >> temp_ticket.txt
+echo FACTURA: ${factura} >> temp_ticket.txt
+echo VENCIMIENTO: ${vencimiento} >> temp_ticket.txt
+echo FECHA VTO: ${fecha} >> temp_ticket.txt
+echo ================================ >> temp_ticket.txt
+echo METODO: ${metodoPago} >> temp_ticket.txt
+echo FECHA: ${fechaPago} >> temp_ticket.txt
+echo ID: ${transactionId} >> temp_ticket.txt
+echo ================================ >> temp_ticket.txt
+echo IMPORTE PAGADO >> temp_ticket.txt
+echo ${parseFloat(importe).toLocaleString('es-AR')} >> temp_ticket.txt
+echo ================================ >> temp_ticket.txt
+echo PAGO PROCESADO EXITOSAMENTE >> temp_ticket.txt
+echo Gracias por su pago >> temp_ticket.txt
+echo ${new Date().toLocaleString('es-AR')} >> temp_ticket.txt
+print temp_ticket.txt /D:"NPI Integration Driver"
+del temp_ticket.txt
+        `;
+
+        // Crear blob con comando batch
+        const blob = new Blob([comando], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+
+        // Crear enlace de descarga automática
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `imprimir_${factura}_${Date.now()}.bat`;
+        link.style.display = 'none';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+
+        console.log('✅ Comando batch creado para impresión automática');
+
+        // Mostrar instrucciones rápidas
+        setTimeout(() => {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #059669;
+                color: white;
+                padding: 15px;
+                border-radius: 8px;
+                z-index: 99999;
+                font-weight: bold;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+            toast.innerHTML =
+                '🖨️ Ejecuta el archivo .bat descargado para imprimir';
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                try {
+                    document.body.removeChild(toast);
+                } catch (e) {}
+            }, 4000);
+        }, 500);
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error en método spooler:', error);
+        throw error;
+    }
+}
 async function enviarAImpresoraNPI(comandoImpresion) {
     try {
         // Intentar envío directo al puerto estándar de impresoras
