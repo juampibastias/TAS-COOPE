@@ -9,41 +9,13 @@ const TAS_SERVICE_CONFIG = {
 };
 
 // ===== DETECTAR IP LOCAL AUTOMÁTICAMENTE =====
+// Versión simplificada que siempre retorna la IP del TAS
 async function obtenerIPLocal() {
-    try {
-        // Método 1: Usar WebRTC para detectar IP local
-        return new Promise((resolve) => {
-            const pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-            });
-
-            pc.createDataChannel('');
-            pc.createOffer().then((offer) => pc.setLocalDescription(offer));
-
-            pc.onicecandidate = (ice) => {
-                if (ice && ice.candidate && ice.candidate.candidate) {
-                    const myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(
-                        ice.candidate.candidate
-                    );
-                    if (myIP && myIP[1] && myIP[1] !== '127.0.0.1') {
-                        pc.close();
-                        resolve(myIP[1]);
-                    }
-                }
-            };
-
-            // Fallback después de 3 segundos
-            setTimeout(() => {
-                pc.close();
-                resolve('192.168.1.12'); // IP por defecto si no detecta
-            }, 3000);
-        });
-    } catch (error) {
-        console.log(
-            'No se pudo detectar IP automáticamente, usando IP guardada'
-        );
-        return localStorage.getItem('tas-ip-local') || '192.168.1.12';
-    }
+    // IP fija del TAS - solución temporal
+    const IP_TAS = '192.168.1.57';
+    localStorage.setItem('tas-ip-local', IP_TAS);
+    console.log('📍 Usando IP fija TAS:', IP_TAS);
+    return IP_TAS;
 }
 
 // ===== FUNCIÓN PRINCIPAL - IMPRESIÓN REAL SIN DIÁLOGOS =====
