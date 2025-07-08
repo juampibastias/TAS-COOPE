@@ -32,7 +32,7 @@ const nextConfig = {
                 ],
             },
             {
-                source: '/qr-coope.gif',
+                source: '/QR-COOPE.gif',
                 headers: [
                     { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
                 ],
