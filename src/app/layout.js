@@ -2,22 +2,26 @@
 import './globals.css';
 
 export const metadata = {
-    title: 'TAS COOPE - Terminal de Autoservicio',
-    description:
-        'Terminal de Autoservicio - Cooperativa Popular de Electricidad',
-    manifest: '/manifest.json',
-    themeColor: '#059669',
-    viewport:
-        'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
-    appleWebApp: {
-        capable: true,
-        statusBarStyle: 'default',
-        title: 'TAS COOPE',
-    },
-    icons: {
-        icon: '/LOGO.png',
-        apple: '/LOGO.png',
-    },
+  title: 'TAS COOPE - Terminal de Autoservicio',
+  description: 'Terminal de Autoservicio - Cooperativa Popular de Electricidad',
+  manifest: '/manifest.json',
+  appleWebApp: {
+      capable: true,
+      statusBarStyle: 'default',
+      title: 'TAS COOPE',
+  },
+  icons: {
+      icon: '/LOGO.png',
+      apple: '/LOGO.png',
+  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#059669',
 };
 
 export default function RootLayout({ children }) {
