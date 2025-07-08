@@ -2,7 +2,7 @@
 const CACHE_NAME = 'tas-coope-assets-v1.0.0';
 
 // Solo cachear assets estáticos básicos
-const STATIC_ASSETS = ['/LOGO.png', '/QR COOPE.gif', '/manifest.json'];
+const STATIC_ASSETS = ['/LOGO.png', '/QR-COOPE.gif', '/manifest.json'];
 
 // Instalación
 self.addEventListener('install', (event) => {

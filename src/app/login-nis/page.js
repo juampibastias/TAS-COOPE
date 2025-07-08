@@ -261,7 +261,7 @@ export default function LoginNISPage() {
         return (
             <div className='fixed inset-0 bg-black flex items-center justify-center z-50'>
                 <img
-                    src='/QR COOPE.gif'
+                    src='/QR-COOPE.gif'
                     alt='Pantalla suspendida'
                     className='w-full h-full object-cover'
                 />
