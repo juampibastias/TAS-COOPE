@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchFacturas } from '../services/facturaService';
 import { clearPolling } from '../services/modoPollingService';
+import { createRoute } from '../utils/routeHelper';
 
 export function useTASFacturas() {
     const [facturas, setFacturas] = useState([]);
@@ -41,12 +42,12 @@ export function useTASFacturas() {
     const volverAlInicio = () => {
         // Limpiar polling si está activo
         clearPolling();
-
+    
         if (typeof window !== 'undefined' && localStorage) {
             localStorage.removeItem('nis');
             localStorage.removeItem('nis_timestamp');
         }
-        window.location.href = '/';
+        window.location.href = createRoute('/');
     };
 
     // Funciones auxiliares para calcular datos derivados

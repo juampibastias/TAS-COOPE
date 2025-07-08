@@ -1,5 +1,6 @@
 // src/services/keyboardShortcuts.js
 import { getTASService } from './tasTerminalService';
+import { createRoute } from '../utils/routeHelper';
 
 class KeyboardShortcuts {
     constructor() {
@@ -23,7 +24,7 @@ class KeyboardShortcuts {
         this.shortcuts.set('ctrl+alt+shift+c', {
             description: 'Abrir configuración de terminal',
             action: () => {
-                window.location.href = '/terminal-config';
+                window.location.href = createRoute('/terminal-config');
             },
         });
 

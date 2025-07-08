@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { QuillDeltaToHtmlConverter } from 'quill-delta-to-html';
+import { createRoute } from '../../utils/routeHelper';
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -120,7 +121,7 @@ export default function ImprimirFormulariosPage() {
     }, [formularioSeleccionado]);
 
     const volverAlHome = () => {
-        window.location.href = '/';
+        window.location.href = createRoute('/');
     };
 
     const seleccionarFormulario = async (formulario) => {

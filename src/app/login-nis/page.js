@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { createRoute } from '../../utils/routeHelper';
 
 const url = process.env.NEXT_PUBLIC_API_URL;
 
@@ -178,7 +179,7 @@ export default function LoginNISPage() {
     };
 
     const volverAlHome = () => {
-        window.location.href = '/';
+        window.location.href = createRoute('/');
     };
 
     const handleSubmit = async () => {
@@ -240,7 +241,7 @@ export default function LoginNISPage() {
                 localStorage.setItem('nis_timestamp', now.toString());
 
                 setIsLoggedIn(true);
-                window.location.href = `/estado-de-cuenta?nis=${nisCompleto}`;
+                window.location.href = createRoute(`/estado-de-cuenta?nis=${nisCompleto}`);
             }
         } catch (e) {
             console.error('[ERROR] Fallo al validar NIS:', e);

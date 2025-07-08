@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useTerminalInstallation } from '../hooks/useTerminalInstallation';
 import TerminalStatusIndicator from '../components/TerminalStatusIndicator';
+import {createRoute} from '../utils/routeHelper';
+
 
 export default function TASHomeScreen() {
     const [modoSuspendido, setModoSuspendido] = useState(true);
@@ -87,11 +89,11 @@ export default function TASHomeScreen() {
 
     // Navegación
     const irAPagarFactura = () => {
-        window.location.href = '/login-nis';
+        window.location.href = createRoute('/login-nis');
     };
-
+    
     const irAImprimirFormularios = () => {
-        window.location.href = '/imprimir-formularios';
+        window.location.href = createRoute('/imprimir-formularios');
     };
 
     // Función para instalar PWA
