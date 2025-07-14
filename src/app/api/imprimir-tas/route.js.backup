@@ -21,7 +21,7 @@ export default async function handler(req, res) {
             servicio: 'TAS Impresion API',
             version: '2.0-legacy',
             metodo: 'VPN',
-            vpn_target: '10.10.5.26:9100',
+            vpn_target: '10.10.5.25:9100',
             timestamp: new Date().toISOString()
         });
     }
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
         const { ipTAS, datos, config } = req.body;
         
         // IP fija para VPN - usar la IP asignada por OpenVPN
-        const targetIP = '10.10.5.26';
+        const targetIP = '2';
         const targetPort = config?.puerto || 9100;
         const tasUrl = `http://${targetIP}:${targetPort}/imprimir`;
         

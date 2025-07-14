@@ -5,7 +5,7 @@ export async function GET() {
         success: true,
         servicio: 'TAS Impresion API',
         version: '2.0-app-router',
-        vpn_target: '10.10.5.26:9100',
+        vpn_target: '10.10.5.25:9100',
         timestamp: new Date().toISOString()
     });
 }
@@ -17,7 +17,7 @@ export async function POST(request) {
         const body = await request.json();
         const { datos } = body;
         
-        const targetIP = '10.10.5.26';
+        const targetIP = '10.10.5.25';
         const tasUrl = `http://${targetIP}:9100/imprimir`;
         
         console.log(`🎯 [App-API] Conectando via VPN a: ${tasUrl}`);
