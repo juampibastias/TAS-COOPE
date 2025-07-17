@@ -2,6 +2,7 @@ import Swal from 'sweetalert2';
 import { processPayment } from '../services/paymentService';
 import { downloadFactura, isVencido } from '../services/facturaService';
 import { useEffect, useState } from 'react';
+
 // Función corregida para calcular importes y estados
 function calcularImportesFactura(factura) {
     const estado = factura.ESTADO;
@@ -347,17 +348,6 @@ function PaymentModal({ factura, nis }) {
     });
 }
 
-// Función para verificar si la impresora NPI está configurada
-function estaImpresoraConfigurada() {
-    try {
-        const config = localStorage.getItem('tas_printer_npi_configured');
-        return config === 'true';
-    } catch (error) {
-        return window.tasPrinterConfigured || false;
-    }
-}
-
-
 // Función para calcular columnas dinámicamente
 function calcularColumnasGrid(cantidadFacturas) {
     if (cantidadFacturas <= 3) return 'grid-cols-3';
@@ -377,230 +367,8 @@ function calcularFilasMaximas(cantidadFacturas) {
     return 4; // máximo 4 filas
 }
 
-// ===== FUNCIÓN PARA CONFIGURAR IMPRESORA NPI =====
-async function configurarImpresoraNPI() {
-    try {
-        const resultado = await Swal.fire({
-            title: '🖨️ Configurar NPI Integration Driver',
-            html: `
-                <div style="text-align: left; padding: 20px;">
-                    <h3 style="color: #059669; margin-bottom: 15px;">Tu impresora térmica detectada:</h3>
-                    <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #0ea5e9;">
-                        <p><strong>🖨️ NPI Integration Driver</strong></p>
-                        <p>📍 Puerto: USB002</p>
-                        <p>🔧 Driver específico instalado</p>
-                    </div>
-                    
-                    <h4 style="color: #059669; margin: 20px 0 10px 0;">✅ Solución recomendada:</h4>
-                    <p>Usar window.print() que funciona perfectamente con tu driver NPI ya instalado.</p>
-                    
-                    <div style="background: #ecfdf5; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #10b981;">
-                        <p style="margin: 0;"><strong>💡 Ventaja:</strong> Aprovecha el driver que ya está funcionando en Windows.</p>
-                    </div>
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: '🚀 CONFIGURAR AHORA',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#059669',
-            width: 600,
-        });
-
-        if (resultado.isConfirmed) {
-            await probarImpresoraNPI();
-        }
-    } catch (error) {
-        console.error('Error en configuración NPI:', error);
-        Swal.fire('Error', error.message, 'error');
-    }
-}
-
-// ===== FUNCIÓN PARA PROBAR IMPRESORA NPI =====
-async function probarImpresoraNPI() {
-    try {
-        Swal.fire({
-            title: 'Configurando NPI Integration Driver...',
-            text: 'Se abrirá el diálogo de impresión. Selecciona "NPI Integration Driver"',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading(),
-        });
-
-        // Crear HTML de prueba
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Configuración NPI Integration Driver</title>
-                <style>
-                    @page {
-                        size: 80mm auto;
-                        margin: 0;
-                    }
-                    @media print {
-                        body {
-                            width: 80mm;
-                            font-family: 'Courier New', monospace;
-                            font-size: 12px;
-                            margin: 0;
-                            padding: 3mm;
-                        }
-                        .header {
-                            text-align: center;
-                            font-weight: bold;
-                            margin-bottom: 5mm;
-                        }
-                        .test-info {
-                            border: 1px solid #000;
-                            padding: 5mm;
-                            margin: 3mm 0;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    CONFIGURACIÓN NPI INTEGRATION DRIVER
-                </div>
-                <div class="test-info">
-                    <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
-                    <p><strong>Puerto:</strong> USB002</p>
-                    <p><strong>Driver:</strong> NPI Integration Driver</p>
-                    <p><strong>Estado:</strong> CONFIGURANDO</p>
-                </div>
-                <div style="text-align: center; margin-top: 10mm;">
-                    <p>Si ves este texto impreso,</p>
-                    <p>la configuración es correcta.</p>
-                    <p>Los próximos pagos imprimirán automáticamente.</p>
-                </div>
-            </body>
-            </html>
-        `;
-
-        // Abrir ventana de impresión
-        const printWindow = window.open('', '_blank', 'width=400,height=600');
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-
-        // Esperar un momento y ejecutar print
-        setTimeout(() => {
-            Swal.close();
-            printWindow.print();
-
-            // Preguntar resultado después de un momento
-            setTimeout(async () => {
-                const resultado = await Swal.fire({
-                    icon: 'question',
-                    title: '¿Funcionó la impresión con NPI Driver?',
-                    html: `
-                        <div style="text-align: left; padding: 15px;">
-                            <p><strong>Instrucciones:</strong></p>
-                            <ol style="margin: 10px 0;">
-                                <li>En el diálogo de impresión, selecciona <strong>"NPI Integration Driver"</strong></li>
-                                <li>Haz clic en "Imprimir"</li>
-                                <li>Verifica si la impresora térmica imprimió el ticket de prueba</li>
-                            </ol>
-                            <p style="margin-top: 15px;"><strong>¿La impresora imprimió correctamente?</strong></p>
-                        </div>
-                    `,
-                    showDenyButton: true,
-                    confirmButtonText: '✅ SÍ IMPRIMIÓ',
-                    denyButtonText: '❌ NO IMPRIMIÓ',
-                    confirmButtonColor: '#059669',
-                    denyButtonColor: '#dc2626',
-                    allowOutsideClick: false,
-                });
-
-                if (resultado.isConfirmed) {
-                    // ✅ GUARDAR CONFIGURACIÓN EXITOSA
-                    try {
-                        localStorage.setItem(
-                            'tas_printer_npi_configured',
-                            'true'
-                        );
-                        localStorage.setItem(
-                            'tas_printer_npi_date',
-                            new Date().toISOString()
-                        );
-                        console.log(
-                            '✅ Configuración NPI guardada correctamente'
-                        );
-                    } catch (error) {
-                        window.tasPrinterConfigured = true;
-                        console.log('✅ Configuración NPI guardada en memoria');
-                    }
-
-                    await Swal.fire({
-                        icon: 'success',
-                        title: '🎉 ¡Impresora configurada correctamente!',
-                        html: `
-                            <div style="text-align: center; padding: 15px;">
-                                <p style="font-size: 18px; color: #059669; font-weight: bold;">✅ NPI Integration Driver configurado</p>
-                                <br>
-                                <p><strong>🚀 A partir de ahora:</strong></p>
-                                <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                                    <p>✅ Todos los pagos imprimirán automáticamente</p>
-                                    <p>✅ Sin diálogos de configuración</p>
-                                    <p>✅ Directo a tu impresora NPI</p>
-                                </div>
-                                <p style="color: #666; font-size: 14px;">La configuración se ha guardado permanentemente</p>
-                            </div>
-                        `,
-                        confirmButtonText: '¡Perfecto!',
-                        confirmButtonColor: '#059669',
-                    });
-                } else if (resultado.isDenied) {
-                    await Swal.fire({
-                        icon: 'warning',
-                        title: 'Problema con NPI Driver',
-                        html: `
-                            <div style="text-align: left; padding: 15px;">
-                                <p><strong>Posibles soluciones:</strong></p>
-                                <ol style="margin: 15px 0;">
-                                    <li><strong>Verificar papel:</strong> Asegurate de que la impresora tenga papel térmico</li>
-                                    <li><strong>Reiniciar impresora:</strong> Apagar y encender la impresora</li>
-                                    <li><strong>Verificar conexión:</strong> Cable USB bien conectado</li>
-                                    <li><strong>Driver actualizado:</strong> Reinstalar NPI Integration Driver</li>
-                                </ol>
-                                <div style="background: #fef3c7; padding: 10px; border-radius: 8px; margin: 10px 0;">
-                                    <p style="margin: 0; font-size: 14px;"><strong>💡 Tip:</strong> Intenta hacer una impresión de prueba desde Windows para verificar que el driver funciona.</p>
-                                </div>
-                                <p style="margin-top: 15px;">Puedes intentar la configuración nuevamente cuando esté resuelto.</p>
-                            </div>
-                        `,
-                        confirmButtonText: 'Entendido',
-                        confirmButtonColor: '#d97706',
-                    });
-                }
-
-                // Cerrar ventana de impresión
-                try {
-                    printWindow.close();
-                } catch (e) {
-                    console.log('Ventana ya cerrada');
-                }
-            }, 3000); // Dar tiempo para que se abra el diálogo
-        }, 1000);
-    } catch (error) {
-        console.error('Error en configuración NPI:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Error en la configuración',
-            text: error.message,
-            confirmButtonText: 'Reintentar',
-        });
-    }
-}
-
 // Componente principal con grid auto-ajustable
 export default function TASFacturasGrid({ facturasImpagas, nis }) {
-    const [mostrarBotonConfig, setMostrarBotonConfig] = useState(false);
-
-    useEffect(() => {
-        const estaConfigurada = estaImpresoraConfigurada();
-        setMostrarBotonConfig(!estaConfigurada);
-    }, []);
-
     if (!facturasImpagas.length) {
         return (
             <div className='bg-green-800/30 p-6 rounded-xl text-center'>
@@ -667,18 +435,6 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                         📋 +{facturasImpagas.length - facturasMostrar} facturas
                         adicionales
                     </p>
-                </div>
-            )}
-
-            {/* BOTÓN DE CONFIGURACIÓN NPI INTEGRATION DRIVER */}
-            {mostrarBotonConfig && (
-                <div className='fixed top-4 right-4 z-50'>
-                    <button
-                        onClick={configurarImpresoraNPI}
-                        className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105'
-                    >
-                        🖨️ CONFIGURAR IMPRESORA NPI
-                    </button>
                 </div>
             )}
         </div>
