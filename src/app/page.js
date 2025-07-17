@@ -1,4 +1,4 @@
-// src/app/page.js - VERSIÓN CORREGIDA
+// src/app/page.js - VERSIÓN CON HEARTBEAT INTELIGENTE
 'use client';
 import { useState, useEffect } from 'react';
 import { createRoute } from '../utils/routeHelper';
@@ -7,131 +7,194 @@ export default function TASHomeScreen() {
     const [modoSuspendido, setModoSuspendido] = useState(true);
     const [mostrarBienvenida, setMostrarBienvenida] = useState(false);
 
-    // 🆕 AUTO-REGISTRO + PROCESAMIENTO DE COMANDOS
-useEffect(() => {
-    const autoRegisterTerminal = async () => {
-        try {
-            console.log('🔍 Intentando auto-registro de terminal...');
-            
-            const response = await fetch('/tas-coope/api/terminal-register');
-            const result = await response.json();
-            
-            console.log('📊 Resultado auto-registro:', result);
-            
-            if (result.registered) {
-                console.log(`✅ Terminal registrada: ${result.terminal.id} (${result.terminal.location})`);
+    // 🆕 AUTO-REGISTRO + PROCESAMIENTO DE COMANDOS + HEARTBEAT INTELIGENTE
+    useEffect(() => {
+        let heartbeatInterval;
+        let fastHeartbeatTimeout;
+        
+        const autoRegisterTerminal = async () => {
+            try {
+                console.log('🔍 Intentando auto-registro de terminal...');
                 
-                // 🆕 PROCESAR COMANDO SI EXISTE
-                if (result.command) {
-                    console.log(`📤 Comando recibido: ${result.command}`);
+                const response = await fetch('/tas-coope/api/terminal-register');
+                const result = await response.json();
+                
+                console.log('📊 Resultado auto-registro:', result);
+                
+                if (result.registered) {
+                    console.log(`✅ Terminal registrada: ${result.terminal.id} (${result.terminal.location})`);
                     
-                    switch (result.command) {
-                        case 'maintenance':
-                            console.log('🔧 Activando modo mantenimiento...');
+                    // 🆕 INICIALIZAR COMMAND SERVICE SI NO EXISTE
+                    if (typeof window !== 'undefined' && window.debugTAS) {
+                        window.debugTAS.setTerminalId(result.terminal.id);
+                    }
+                    
+                    // 🆕 PROCESAR COMANDO SI EXISTE
+                    if (result.command) {
+                        console.log(`📤 Comando recibido: ${result.command}`);
+                        
+                        // 🆕 USAR COMMAND SERVICE SI ESTÁ DISPONIBLE
+                        if (typeof window !== 'undefined' && window.debugTAS) {
+                            console.log('🎯 Usando TAS Command Service para ejecutar comando...');
+                            window.debugTAS.executeCommand(result.command, result.command_id);
+                        } else {
+                            // 🔄 FALLBACK: Lógica original para comandos básicos
+                            console.log('⚠️ TAS Command Service no disponible, usando fallback...');
                             
-                            // Cambiar a modo mantenimiento
-                            setModoSuspendido(true);
-                            
-                            // Mostrar mensaje de mantenimiento en lugar del GIF
-                            const maintenanceMessage = document.createElement('div');
-                            maintenanceMessage.innerHTML = `
-                                <div style="
-                                    position: fixed;
-                                    top: 0;
-                                    left: 0;
-                                    width: 100%;
-                                    height: 100%;
-                                    background: linear-gradient(135deg, #ff6b35, #f7931e);
-                                    display: flex;
-                                    flex-direction: column;
-                                    justify-content: center;
-                                    align-items: center;
-                                    color: white;
-                                    font-family: Arial, sans-serif;
-                                    z-index: 9999;
-                                ">
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 120px; margin-bottom: 30px;">🔧</div>
-                                        <h1 style="font-size: 60px; margin-bottom: 20px; font-weight: bold;">
-                                            MANTENIMIENTO
-                                        </h1>
-                                        <p style="font-size: 30px; margin-bottom: 40px;">
-                                            Terminal fuera de servicio temporalmente
-                                        </p>
-                                        <p style="font-size: 24px; opacity: 0.9;">
-                                            Disculpe las molestias ocasionadas
-                                        </p>
-                                    </div>
-                                </div>
-                            `;
-                            document.body.appendChild(maintenanceMessage);
-                            
-                            // Confirmar comando ejecutado
-                            try {
-                                await fetch('/tas-coope/api/command-executed', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        command: result.command,
-                                        success: true,
-                                        execution_time: Date.now()
-                                    })
-                                });
-                                console.log('✅ Comando de mantenimiento confirmado');
-                            } catch (error) {
-                                console.error('❌ Error confirmando comando:', error);
+                            switch (result.command) {
+                                case 'maintenance':
+                                    console.log('🔧 Activando modo mantenimiento...');
+                                    
+                                    // Cambiar a modo mantenimiento
+                                    setModoSuspendido(true);
+                                    
+                                    // Mostrar mensaje de mantenimiento en lugar del GIF
+                                    const maintenanceMessage = document.createElement('div');
+                                    maintenanceMessage.innerHTML = `
+                                        <div style="
+                                            position: fixed;
+                                            top: 0;
+                                            left: 0;
+                                            width: 100%;
+                                            height: 100%;
+                                            background: linear-gradient(135deg, #ff6b35, #f7931e);
+                                            display: flex;
+                                            flex-direction: column;
+                                            justify-content: center;
+                                            align-items: center;
+                                            color: white;
+                                            font-family: Arial, sans-serif;
+                                            z-index: 9999;
+                                        ">
+                                            <div style="text-align: center;">
+                                                <div style="font-size: 120px; margin-bottom: 30px;">🔧</div>
+                                                <h1 style="font-size: 60px; margin-bottom: 20px; font-weight: bold;">
+                                                    MANTENIMIENTO
+                                                </h1>
+                                                <p style="font-size: 30px; margin-bottom: 40px;">
+                                                    Terminal fuera de servicio temporalmente
+                                                </p>
+                                                <p style="font-size: 24px; opacity: 0.9;">
+                                                    Disculpe las molestias ocasionadas
+                                                </p>
+                                            </div>
+                                        </div>
+                                    `;
+                                    document.body.appendChild(maintenanceMessage);
+                                    
+                                    // Confirmar comando ejecutado
+                                    try {
+                                        await fetch('/tas-coope/api/command-executed', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                command: result.command,
+                                                success: true,
+                                                execution_time: Date.now()
+                                            })
+                                        });
+                                        console.log('✅ Comando de mantenimiento confirmado');
+                                    } catch (error) {
+                                        console.error('❌ Error confirmando comando:', error);
+                                    }
+                                    break;
+                                    
+                                case 'restart':
+                                    console.log('🔄 Reiniciando aplicación...');
+                                    window.location.reload();
+                                    break;
+                                    
+                                case 'reboot':
+                                    console.log('🔄 Reiniciando sistema...');
+                                    // Mostrar mensaje y recargar
+                                    alert('Sistema reiniciándose...');
+                                    window.location.reload();
+                                    break;
+                                    
+                                default:
+                                    console.log(`⚠️ Comando desconocido: ${result.command}`);
                             }
-                            break;
-                            
-                        case 'restart':
-                            console.log('🔄 Reiniciando aplicación...');
-                            window.location.reload();
-                            break;
-                            
-                        case 'reboot':
-                            console.log('🔄 Reiniciando sistema...');
-                            // Mostrar mensaje y recargar
-                            alert('Sistema reiniciándose...');
-                            window.location.reload();
-                            break;
-                            
-                        default:
-                            console.log(`⚠️ Comando desconocido: ${result.command}`);
+                        }
+                        
+                        // 🚀 ACTIVAR HEARTBEAT RÁPIDO después de recibir comando
+                        console.log('🚀 Activando heartbeat rápido por 2 minutos...');
+                        startFastHeartbeat();
+                        
+                    } else {
+                        console.log('📭 Sin comandos pendientes');
                     }
                 } else {
-                    console.log('📭 Sin comandos pendientes');
+                    console.log(`ℹ️ Terminal no registrada: ${result.reason}`);
                 }
-            } else {
-                console.log(`ℹ️ Terminal no registrada: ${result.reason}`);
+            } catch (error) {
+                console.error('❌ Error en auto-registro:', error);
             }
-        } catch (error) {
-            console.error('❌ Error en auto-registro:', error);
-        }
-    };
-    
-    // Auto-registro inicial
-    autoRegisterTerminal();
-    
-    // 🆕 HEARTBEAT CONTINUO cada 30 segundos
-    const heartbeatInterval = setInterval(async () => {
-        try {
-            console.log('💓 Enviando heartbeat...');
-            const response = await fetch('/tas-coope/api/terminal-register');
-            const result = await response.json();
+        };
+        
+        // 🚀 HEARTBEAT RÁPIDO (cada 5 segundos por 2 minutos)
+        const startFastHeartbeat = () => {
+            // Limpiar heartbeat rápido anterior si existe
+            if (fastHeartbeatTimeout) {
+                clearTimeout(fastHeartbeatTimeout);
+            }
             
-            // Procesar comandos en cada heartbeat
-            if (result.command) {
-                console.log(`📤 Nuevo comando en heartbeat: ${result.command}`);
-                // Reutilizar la lógica de procesamiento
-                autoRegisterTerminal();
+            // Limpiar heartbeat normal y usar rápido
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
             }
-        } catch (error) {
-            console.error('❌ Heartbeat failed:', error);
-        }
-    }, 30000); // 30 segundos
-    
-    return () => clearInterval(heartbeatInterval);
-}, []);
+            
+            console.log('⚡ Iniciando heartbeat rápido (5s)...');
+            
+            // Heartbeat cada 5 segundos
+            const fastInterval = setInterval(async () => {
+                try {
+                    console.log('💨 Heartbeat rápido...');
+                    await autoRegisterTerminal();
+                } catch (error) {
+                    console.error('❌ Fast heartbeat failed:', error);
+                }
+            }, 5000); // 5 segundos
+            
+            // Volver a heartbeat normal después de 2 minutos
+            fastHeartbeatTimeout = setTimeout(() => {
+                console.log('🔄 Volviendo a heartbeat normal (30s)...');
+                clearInterval(fastInterval);
+                startNormalHeartbeat();
+            }, 2 * 60 * 1000); // 2 minutos
+        };
+        
+        // 💓 HEARTBEAT NORMAL (cada 30 segundos)
+        const startNormalHeartbeat = () => {
+            heartbeatInterval = setInterval(async () => {
+                try {
+                    console.log('💓 Enviando heartbeat...');
+                    const response = await fetch('/tas-coope/api/terminal-register');
+                    const result = await response.json();
+                    
+                    // Procesar comandos en cada heartbeat
+                    if (result.command) {
+                        console.log(`📤 Nuevo comando en heartbeat: ${result.command}`);
+                        // Reiniciar ciclo con heartbeat rápido
+                        await autoRegisterTerminal();
+                    }
+                } catch (error) {
+                    console.error('❌ Heartbeat failed:', error);
+                }
+            }, 30000); // 30 segundos
+        };
+        
+        // Auto-registro inicial
+        autoRegisterTerminal();
+        
+        // Iniciar heartbeat normal
+        startNormalHeartbeat();
+        
+        // Cleanup al desmontar componente
+        return () => {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            if (fastHeartbeatTimeout) clearTimeout(fastHeartbeatTimeout);
+        };
+    }, []);
 
     // ⏱ Inactividad -> suspensión (5 minutos)
     useEffect(() => {
@@ -145,6 +208,15 @@ useEffect(() => {
         };
 
         const handleUserInteraction = () => {
+            // 🆕 VERIFICAR SI ESTÁ EN MANTENIMIENTO USANDO COMMAND SERVICE
+            if (typeof window !== 'undefined' && window.debugTAS) {
+                const status = window.debugTAS.getStatus();
+                if (status.maintenanceActive) {
+                    console.log('🔧 En modo mantenimiento - interacción bloqueada');
+                    return; // Bloquear interacción durante mantenimiento
+                }
+            }
+            
             if (modoSuspendido) {
                 setModoSuspendido(false);
                 setMostrarBienvenida(true);
