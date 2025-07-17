@@ -1,4 +1,4 @@
-// src/app/page.js - VERSIÓN CON HEARTBEAT INTELIGENTE
+// src/app/page.js - VERSIÓN CON HEARTBEAT INTELIGENTE Y EJECUCIÓN DE COMANDOS
 'use client';
 import { useState, useEffect } from 'react';
 import { createRoute } from '../utils/routeHelper';
@@ -11,6 +11,33 @@ export default function TASHomeScreen() {
     useEffect(() => {
         let heartbeatInterval;
         let fastHeartbeatTimeout;
+        
+        // 🔧 FUNCIÓN PARA CONFIRMAR COMANDO EJECUTADO
+        const confirmCommandExecution = async (commandId, success, errorMessage = null) => {
+            console.log(`📤 Confirmando comando ${commandId}: ${success ? 'ÉXITO' : 'FALLO'}`);
+            
+            try {
+                const response = await fetch('/tas-coope/api/command-executed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        command_id: commandId,
+                        success: success,
+                        error_message: errorMessage,
+                        execution_time: Date.now(),
+                        terminal_id: 'VPN_25'
+                    })
+                });
+
+                if (response.ok) {
+                    console.log('✅ Comando confirmado al backend');
+                } else {
+                    console.log('⚠️ Error confirmando comando:', response.status);
+                }
+            } catch (error) {
+                console.log('❌ Error enviando confirmación:', error.message);
+            }
+        };
         
         const autoRegisterTerminal = async () => {
             try {
@@ -38,81 +65,143 @@ export default function TASHomeScreen() {
                             console.log('🎯 Usando TAS Command Service para ejecutar comando...');
                             window.debugTAS.executeCommand(result.command, result.command_id);
                         } else {
-                            // 🔄 FALLBACK: Lógica original para comandos básicos
+                            // 🔄 FALLBACK: Lógica mejorada para comandos básicos
                             console.log('⚠️ TAS Command Service no disponible, usando fallback...');
                             
-                            switch (result.command) {
-                                case 'maintenance':
-                                    console.log('🔧 Activando modo mantenimiento...');
-                                    
-                                    // Cambiar a modo mantenimiento
-                                    setModoSuspendido(true);
-                                    
-                                    // Mostrar mensaje de mantenimiento en lugar del GIF
-                                    const maintenanceMessage = document.createElement('div');
-                                    maintenanceMessage.innerHTML = `
-                                        <div style="
-                                            position: fixed;
-                                            top: 0;
-                                            left: 0;
-                                            width: 100%;
-                                            height: 100%;
-                                            background: linear-gradient(135deg, #ff6b35, #f7931e);
-                                            display: flex;
-                                            flex-direction: column;
-                                            justify-content: center;
-                                            align-items: center;
-                                            color: white;
-                                            font-family: Arial, sans-serif;
-                                            z-index: 9999;
-                                        ">
-                                            <div style="text-align: center;">
-                                                <div style="font-size: 120px; margin-bottom: 30px;">🔧</div>
-                                                <h1 style="font-size: 60px; margin-bottom: 20px; font-weight: bold;">
-                                                    MANTENIMIENTO
-                                                </h1>
-                                                <p style="font-size: 30px; margin-bottom: 40px;">
-                                                    Terminal fuera de servicio temporalmente
-                                                </p>
-                                                <p style="font-size: 24px; opacity: 0.9;">
-                                                    Disculpe las molestias ocasionadas
-                                                </p>
+                            try {
+                                switch (result.command) {
+                                    case 'maintenance':
+                                        console.log('🔧 Activando modo mantenimiento...');
+                                        
+                                        // Cambiar a modo mantenimiento
+                                        setModoSuspendido(true);
+                                        
+                                        // Mostrar mensaje de mantenimiento en lugar del GIF
+                                        const maintenanceMessage = document.createElement('div');
+                                        maintenanceMessage.id = 'maintenance-overlay';
+                                        maintenanceMessage.innerHTML = `
+                                            <div style="
+                                                position: fixed;
+                                                top: 0;
+                                                left: 0;
+                                                width: 100%;
+                                                height: 100%;
+                                                background: linear-gradient(135deg, #ff6b35, #f7931e);
+                                                display: flex;
+                                                flex-direction: column;
+                                                justify-content: center;
+                                                align-items: center;
+                                                color: white;
+                                                font-family: Arial, sans-serif;
+                                                z-index: 9999;
+                                                user-select: none;
+                                            ">
+                                                <div style="text-align: center; max-width: 800px; padding: 40px;">
+                                                    <div style="font-size: 120px; margin-bottom: 30px; animation: pulse 2s infinite;">🔧</div>
+                                                    <h1 style="font-size: 60px; margin-bottom: 20px; font-weight: bold;">
+                                                        MANTENIMIENTO
+                                                    </h1>
+                                                    <p style="font-size: 30px; margin-bottom: 40px;">
+                                                        Terminal fuera de servicio temporalmente
+                                                    </p>
+                                                    <p style="font-size: 24px; opacity: 0.9;">
+                                                        Disculpe las molestias ocasionadas
+                                                    </p>
+                                                    <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 15px; margin-top: 40px;">
+                                                        <p style="margin: 0; font-size: 18px;">✅ Comando ejecutado automáticamente</p>
+                                                        <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.7;">Command ID: ${result.command_id}</p>
+                                                        <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.6;">Sistema en modo mantenimiento</p>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    `;
-                                    document.body.appendChild(maintenanceMessage);
-                                    
-                                    // Confirmar comando ejecutado
-                                    try {
-                                        await fetch('/tas-coope/api/command-executed', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                command: result.command,
-                                                success: true,
-                                                execution_time: Date.now()
-                                            })
-                                        });
+                                            <style>
+                                                @keyframes pulse {
+                                                    0%, 100% { transform: scale(1); opacity: 1; }
+                                                    50% { transform: scale(1.1); opacity: 0.8; }
+                                                }
+                                            </style>
+                                        `;
+                                        document.body.appendChild(maintenanceMessage);
+                                        document.body.style.overflow = 'hidden';
+                                        
+                                        // Confirmar comando ejecutado
+                                        await confirmCommandExecution(result.command_id, true);
                                         console.log('✅ Comando de mantenimiento confirmado');
-                                    } catch (error) {
-                                        console.error('❌ Error confirmando comando:', error);
-                                    }
-                                    break;
-                                    
-                                case 'restart':
-                                    console.log('🔄 Reiniciando aplicación...');
-                                    window.location.reload();
-                                    break;
-                                    
-                                case 'reboot':
-                                    console.log('🔄 Reiniciando sistema...');
-                                    // Mostrar mensaje y recargar
-                                    alert('Sistema reiniciándose...');
-                                    window.location.reload();
-                                    break;
-                                    
-                                default:
-                                    console.log(`⚠️ Comando desconocido: ${result.command}`);
+                                        break;
+                                        
+                                    case 'exit_maintenance':
+                                    case 'online':
+                                        console.log('✅ Saliendo del modo mantenimiento...');
+                                        
+                                        const overlay = document.getElementById('maintenance-overlay');
+                                        if (overlay) {
+                                            document.body.removeChild(overlay);
+                                            document.body.style.overflow = 'auto';
+                                        }
+                                        
+                                        setModoSuspendido(false);
+                                        
+                                        await confirmCommandExecution(result.command_id, true);
+                                        console.log('✅ Modo mantenimiento desactivado');
+                                        break;
+                                        
+                                    case 'restart':
+                                        console.log('🔄 Reiniciando aplicación...');
+                                        await confirmCommandExecution(result.command_id, true);
+                                        setTimeout(() => {
+                                            window.location.reload();
+                                        }, 2000);
+                                        break;
+                                        
+                                    case 'reboot':
+                                        console.log('🔄 Reiniciando sistema...');
+                                        await confirmCommandExecution(result.command_id, true);
+                                        setTimeout(() => {
+                                            try {
+                                                window.close();
+                                            } catch (e) {
+                                                window.location.reload();
+                                            }
+                                        }, 3000);
+                                        break;
+                                        
+                                    case 'show_message':
+                                        console.log('💬 Mostrando mensaje...');
+                                        
+                                        const message = result.command_data?.message || 'Mensaje del sistema';
+                                        const duration = result.command_data?.duration || 5000;
+                                        
+                                        const messageDiv = document.createElement('div');
+                                        messageDiv.innerHTML = `
+                                            <div style="
+                                                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                                                background: rgba(0, 0, 0, 0.9); color: white; padding: 30px 50px;
+                                                border-radius: 15px; font-size: 24px; font-weight: bold;
+                                                text-align: center; z-index: 10000; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                                                border: 2px solid #059669; font-family: Arial; max-width: 80%;
+                                            ">
+                                                ${message}
+                                            </div>
+                                        `;
+                                        
+                                        document.body.appendChild(messageDiv);
+                                        
+                                        setTimeout(() => {
+                                            if (document.body.contains(messageDiv)) {
+                                                document.body.removeChild(messageDiv);
+                                            }
+                                        }, duration);
+                                        
+                                        await confirmCommandExecution(result.command_id, true);
+                                        break;
+                                        
+                                    default:
+                                        console.log(`⚠️ Comando desconocido: ${result.command}`);
+                                        await confirmCommandExecution(result.command_id, false, `Comando no reconocido: ${result.command}`);
+                                }
+                            } catch (error) {
+                                console.error('❌ Error ejecutando comando:', error);
+                                await confirmCommandExecution(result.command_id, false, error.message);
                             }
                         }
                         
@@ -215,6 +304,13 @@ export default function TASHomeScreen() {
                     console.log('🔧 En modo mantenimiento - interacción bloqueada');
                     return; // Bloquear interacción durante mantenimiento
                 }
+            }
+            
+            // También verificar si hay overlay de mantenimiento
+            const maintenanceOverlay = document.getElementById('maintenance-overlay');
+            if (maintenanceOverlay) {
+                console.log('🔧 Overlay de mantenimiento activo - interacción bloqueada');
+                return;
             }
             
             if (modoSuspendido) {

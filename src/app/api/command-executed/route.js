@@ -76,7 +76,7 @@ export async function POST(request) {
         
         // Aquí se enviaría la confirmación al backend real
         try {
-            const backendResponse = await fetch('http://localhost:3001/terminalsApi/command-executed', {
+            const backendResponse = await fetch('http://10.10.5.222:3001/terminalsApi/command-executed', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
