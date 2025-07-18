@@ -1,4 +1,4 @@
-// src/app/page.js - VERSIÓN CON HEARTBEAT INTELIGENTE Y EJECUCIÓN DE COMANDOS
+// src/app/page.js - VERSIÓN CON CONTROL DE RATE LIMITING
 'use client';
 import { useState, useEffect } from 'react';
 import { createRoute } from '../utils/routeHelper';
@@ -7,10 +7,27 @@ export default function TASHomeScreen() {
     const [modoSuspendido, setModoSuspendido] = useState(true);
     const [mostrarBienvenida, setMostrarBienvenida] = useState(false);
 
-    // 🆕 AUTO-REGISTRO + PROCESAMIENTO DE COMANDOS + HEARTBEAT INTELIGENTE
+    // 🆕 AUTO-REGISTRO + CONTROL DE RATE LIMITING
     useEffect(() => {
         let heartbeatInterval;
         let fastHeartbeatTimeout;
+        let rateLimitCount = 0;
+        
+        // 🔧 INICIALIZAR TAS COMMAND SERVICE
+        const initializeTASCommandService = () => {
+            if (typeof window !== 'undefined') {
+                import('../services/tasCommandService.js').then((module) => {
+                    const tasCommandService = module.default;
+                    console.log('🔧 TAS Command Service inicializado:', tasCommandService);
+                    
+                    tasCommandService.setTerminalId('VPN_25');
+                    window.tasCommandService = tasCommandService;
+                    tasCommandService.checkMaintenanceStatus();
+                }).catch(error => {
+                    console.error('❌ Error inicializando TAS Command Service:', error);
+                });
+            }
+        };
         
         // 🔧 FUNCIÓN PARA CONFIRMAR COMANDO EJECUTADO
         const confirmCommandExecution = async (commandId, success, errorMessage = null) => {
@@ -39,6 +56,7 @@ export default function TASHomeScreen() {
             }
         };
         
+        // 🛡️ FUNCIÓN DE AUTO-REGISTRO CON PROTECCIÓN CONTRA RATE LIMITING
         const autoRegisterTerminal = async () => {
             try {
                 console.log('🔍 Intentando auto-registro de terminal...');
@@ -48,166 +66,63 @@ export default function TASHomeScreen() {
                 
                 console.log('📊 Resultado auto-registro:', result);
                 
-                if (result.registered) {
-                    console.log(`✅ Terminal registrada: ${result.terminal.id} (${result.terminal.location})`);
+                // 🛡️ DETECTAR RATE LIMITING
+                if (result.backend_status === 429 || result.reason?.includes('solicitudes')) {
+                    rateLimitCount++;
+                    console.warn(`🚨 Rate Limiting detectado! Intento ${rateLimitCount}`);
                     
-                    // 🆕 INICIALIZAR COMMAND SERVICE SI NO EXISTE
-                    if (typeof window !== 'undefined' && window.debugTAS) {
-                        window.debugTAS.setTerminalId(result.terminal.id);
+                    if (rateLimitCount >= 3) {
+                        console.warn('🛑 Demasiados rate limits. Pausando heartbeat rápido...');
+                        clearInterval(heartbeatInterval);
+                        clearTimeout(fastHeartbeatTimeout);
+                        
+                        // Volver a heartbeat muy lento
+                        setTimeout(() => {
+                            console.log('🔄 Reiniciando con heartbeat lento (60s)...');
+                            rateLimitCount = 0; // Reset contador
+                            startSlowHeartbeat();
+                        }, 60000); // Esperar 1 minuto
+                        return;
                     }
+                    
+                    // Hacer pausa exponencial
+                    const pauseTime = Math.min(10000 * rateLimitCount, 30000); // Max 30 segundos
+                    console.log(`⏸️ Pausando ${pauseTime/1000}s por rate limiting...`);
+                    await new Promise(resolve => setTimeout(resolve, pauseTime));
+                    return;
+                }
+                
+                // 🎯 RESETEAR CONTADOR SI LA RESPUESTA ES EXITOSA
+                if (result.registered) {
+                    rateLimitCount = 0; // Reset si funciona
+                    console.log(`✅ Terminal registrada: ${result.terminal.id} (${result.terminal.location})`);
                     
                     // 🆕 PROCESAR COMANDO SI EXISTE
                     if (result.command) {
                         console.log(`📤 Comando recibido: ${result.command}`);
                         
-                        // 🆕 USAR COMMAND SERVICE SI ESTÁ DISPONIBLE
-                        if (typeof window !== 'undefined' && window.debugTAS) {
-                            console.log('🎯 Usando TAS Command Service para ejecutar comando...');
-                            window.debugTAS.executeCommand(result.command, result.command_id);
-                        } else {
-                            // 🔄 FALLBACK: Lógica mejorada para comandos básicos
-                            console.log('⚠️ TAS Command Service no disponible, usando fallback...');
-                            
-                            try {
-                                switch (result.command) {
-                                    case 'maintenance':
-                                        console.log('🔧 Activando modo mantenimiento...');
-                                        
-                                        // Cambiar a modo mantenimiento
-                                        setModoSuspendido(true);
-                                        
-                                        // Mostrar mensaje de mantenimiento en lugar del GIF
-                                        const maintenanceMessage = document.createElement('div');
-                                        maintenanceMessage.id = 'maintenance-overlay';
-                                        maintenanceMessage.innerHTML = `
-                                            <div style="
-                                                position: fixed;
-                                                top: 0;
-                                                left: 0;
-                                                width: 100%;
-                                                height: 100%;
-                                                background: linear-gradient(135deg, #ff6b35, #f7931e);
-                                                display: flex;
-                                                flex-direction: column;
-                                                justify-content: center;
-                                                align-items: center;
-                                                color: white;
-                                                font-family: Arial, sans-serif;
-                                                z-index: 9999;
-                                                user-select: none;
-                                            ">
-                                                <div style="text-align: center; max-width: 800px; padding: 40px;">
-                                                    <div style="font-size: 120px; margin-bottom: 30px; animation: pulse 2s infinite;">🔧</div>
-                                                    <h1 style="font-size: 60px; margin-bottom: 20px; font-weight: bold;">
-                                                        MANTENIMIENTO
-                                                    </h1>
-                                                    <p style="font-size: 30px; margin-bottom: 40px;">
-                                                        Terminal fuera de servicio temporalmente
-                                                    </p>
-                                                    <p style="font-size: 24px; opacity: 0.9;">
-                                                        Disculpe las molestias ocasionadas
-                                                    </p>
-                                                    <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 15px; margin-top: 40px;">
-                                                        <p style="margin: 0; font-size: 18px;">✅ Comando ejecutado automáticamente</p>
-                                                        <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.7;">Command ID: ${result.command_id}</p>
-                                                        <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.6;">Sistema en modo mantenimiento</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <style>
-                                                @keyframes pulse {
-                                                    0%, 100% { transform: scale(1); opacity: 1; }
-                                                    50% { transform: scale(1.1); opacity: 0.8; }
-                                                }
-                                            </style>
-                                        `;
-                                        document.body.appendChild(maintenanceMessage);
-                                        document.body.style.overflow = 'hidden';
-                                        
-                                        // Confirmar comando ejecutado
-                                        await confirmCommandExecution(result.command_id, true);
-                                        console.log('✅ Comando de mantenimiento confirmado');
-                                        break;
-                                        
-                                    case 'exit_maintenance':
-                                    case 'online':
-                                        console.log('✅ Saliendo del modo mantenimiento...');
-                                        
-                                        const overlay = document.getElementById('maintenance-overlay');
-                                        if (overlay) {
-                                            document.body.removeChild(overlay);
-                                            document.body.style.overflow = 'auto';
-                                        }
-                                        
-                                        setModoSuspendido(false);
-                                        
-                                        await confirmCommandExecution(result.command_id, true);
-                                        console.log('✅ Modo mantenimiento desactivado');
-                                        break;
-                                        
-                                    case 'restart':
-                                        console.log('🔄 Reiniciando aplicación...');
-                                        await confirmCommandExecution(result.command_id, true);
-                                        setTimeout(() => {
-                                            window.location.reload();
-                                        }, 2000);
-                                        break;
-                                        
-                                    case 'reboot':
-                                        console.log('🔄 Reiniciando sistema...');
-                                        await confirmCommandExecution(result.command_id, true);
-                                        setTimeout(() => {
-                                            try {
-                                                window.close();
-                                            } catch (e) {
-                                                window.location.reload();
-                                            }
-                                        }, 3000);
-                                        break;
-                                        
-                                    case 'show_message':
-                                        console.log('💬 Mostrando mensaje...');
-                                        
-                                        const message = result.command_data?.message || 'Mensaje del sistema';
-                                        const duration = result.command_data?.duration || 5000;
-                                        
-                                        const messageDiv = document.createElement('div');
-                                        messageDiv.innerHTML = `
-                                            <div style="
-                                                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-                                                background: rgba(0, 0, 0, 0.9); color: white; padding: 30px 50px;
-                                                border-radius: 15px; font-size: 24px; font-weight: bold;
-                                                text-align: center; z-index: 10000; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                                                border: 2px solid #059669; font-family: Arial; max-width: 80%;
-                                            ">
-                                                ${message}
-                                            </div>
-                                        `;
-                                        
-                                        document.body.appendChild(messageDiv);
-                                        
-                                        setTimeout(() => {
-                                            if (document.body.contains(messageDiv)) {
-                                                document.body.removeChild(messageDiv);
-                                            }
-                                        }, duration);
-                                        
-                                        await confirmCommandExecution(result.command_id, true);
-                                        break;
-                                        
-                                    default:
-                                        console.log(`⚠️ Comando desconocido: ${result.command}`);
-                                        await confirmCommandExecution(result.command_id, false, `Comando no reconocido: ${result.command}`);
-                                }
-                            } catch (error) {
-                                console.error('❌ Error ejecutando comando:', error);
-                                await confirmCommandExecution(result.command_id, false, error.message);
-                            }
+                        // 🚀 DETENER HEARTBEAT RÁPIDO INMEDIATAMENTE
+                        if (fastHeartbeatTimeout) {
+                            clearTimeout(fastHeartbeatTimeout);
+                        }
+                        if (heartbeatInterval) {
+                            clearInterval(heartbeatInterval);
                         }
                         
-                        // 🚀 ACTIVAR HEARTBEAT RÁPIDO después de recibir comando
-                        console.log('🚀 Activando heartbeat rápido por 2 minutos...');
-                        startFastHeartbeat();
+                        // 🆕 USAR TAS COMMAND SERVICE SI ESTÁ DISPONIBLE
+                        if (typeof window !== 'undefined' && window.tasCommandService) {
+                            console.log('🎯 Usando TAS Command Service para ejecutar comando...');
+                            await window.tasCommandService.executeCommand(result.command, result.command_id, result.command_data);
+                        } else {
+                            console.log('⚠️ TAS Command Service no disponible, usando fallback básico...');
+                            await executeCommandFallback(result.command, result.command_id);
+                        }
+                        
+                        // 🔄 VOLVER A HEARTBEAT NORMAL DESPUÉS DE EJECUTAR COMANDO
+                        setTimeout(() => {
+                            console.log('🔄 Volviendo a heartbeat normal después de comando...');
+                            startNormalHeartbeat();
+                        }, 10000); // 10 segundos después del comando
                         
                     } else {
                         console.log('📭 Sin comandos pendientes');
@@ -217,66 +132,166 @@ export default function TASHomeScreen() {
                 }
             } catch (error) {
                 console.error('❌ Error en auto-registro:', error);
+                rateLimitCount++;
             }
         };
         
-        // 🚀 HEARTBEAT RÁPIDO (cada 5 segundos por 2 minutos)
+        // 🔄 FUNCIÓN FALLBACK PARA COMANDOS BÁSICOS
+        const executeCommandFallback = async (command, commandId) => {
+            try {
+                switch (command) {
+                    case 'maintenance':
+                        console.log('🔧 Activando modo mantenimiento (fallback)...');
+                        setModoSuspendido(true);
+                        createMaintenanceOverlay(commandId);
+                        await confirmCommandExecution(commandId, true);
+                        break;
+                        
+                    case 'exit_maintenance':
+                    case 'online':
+                        console.log('✅ Saliendo del modo mantenimiento (fallback)...');
+                        removeMaintenanceOverlay();
+                        setModoSuspendido(false);
+                        await confirmCommandExecution(commandId, true);
+                        break;
+                        
+                    case 'restart':
+                        console.log('🔄 Reiniciando aplicación (fallback)...');
+                        await confirmCommandExecution(commandId, true);
+                        setTimeout(() => window.location.reload(), 2000);
+                        break;
+                        
+                    default:
+                        console.log(`⚠️ Comando desconocido (fallback): ${command}`);
+                        await confirmCommandExecution(commandId, false, `Comando no reconocido: ${command}`);
+                }
+            } catch (error) {
+                console.error('❌ Error ejecutando comando (fallback):', error);
+                await confirmCommandExecution(commandId, false, error.message);
+            }
+        };
+        
+        // 🎨 CREAR OVERLAY DE MANTENIMIENTO
+        const createMaintenanceOverlay = (commandId) => {
+            const existingOverlay = document.getElementById('maintenance-overlay-fallback');
+            if (existingOverlay) {
+                document.body.removeChild(existingOverlay);
+            }
+            
+            const maintenanceMessage = document.createElement('div');
+            maintenanceMessage.id = 'maintenance-overlay-fallback';
+            maintenanceMessage.innerHTML = `
+                <div style="
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: linear-gradient(135deg, #ff6b35, #f7931e);
+                    display: flex; flex-direction: column; justify-content: center; align-items: center;
+                    color: white; font-family: Arial, sans-serif; z-index: 9999; user-select: none;
+                ">
+                    <div style="text-align: center; max-width: 800px; padding: 40px;">
+                        <div style="font-size: 120px; margin-bottom: 30px; animation: pulse 2s infinite;">🔧</div>
+                        <h1 style="font-size: 60px; margin-bottom: 20px; font-weight: bold;">MANTENIMIENTO</h1>
+                        <p style="font-size: 30px; margin-bottom: 40px;">Terminal fuera de servicio temporalmente</p>
+                        <p style="font-size: 24px; opacity: 0.9;">Disculpe las molestias ocasionadas</p>
+                        <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 15px; margin-top: 40px;">
+                            <p style="margin: 0; font-size: 18px;">✅ Comando ejecutado exitosamente</p>
+                            <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.7;">Command ID: ${commandId}</p>
+                            <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.6;">Iniciado: ${new Date().toLocaleString('es-AR')}</p>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
+                </style>
+            `;
+            document.body.appendChild(maintenanceMessage);
+            document.body.style.overflow = 'hidden';
+        };
+        
+        // 🗑️ REMOVER OVERLAY DE MANTENIMIENTO
+        const removeMaintenanceOverlay = () => {
+            const overlay = document.getElementById('maintenance-overlay-fallback');
+            if (overlay) {
+                document.body.removeChild(overlay);
+                document.body.style.overflow = 'auto';
+                console.log('🗑️ Overlay de mantenimiento removido');
+            }
+        };
+        
+        // 🚀 HEARTBEAT RÁPIDO CONTROLADO (cada 15 segundos, max 1 minuto)
         const startFastHeartbeat = () => {
-            // Limpiar heartbeat rápido anterior si existe
-            if (fastHeartbeatTimeout) {
-                clearTimeout(fastHeartbeatTimeout);
-            }
+            if (fastHeartbeatTimeout) clearTimeout(fastHeartbeatTimeout);
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
             
-            // Limpiar heartbeat normal y usar rápido
-            if (heartbeatInterval) {
-                clearInterval(heartbeatInterval);
-            }
+            console.log('⚡ Iniciando heartbeat rápido CONTROLADO (15s por 1 minuto)...');
             
-            console.log('⚡ Iniciando heartbeat rápido (5s)...');
-            
-            // Heartbeat cada 5 segundos
+            // Heartbeat cada 15 segundos (más lento para evitar rate limiting)
             const fastInterval = setInterval(async () => {
                 try {
-                    console.log('💨 Heartbeat rápido...');
+                    console.log('💨 Heartbeat rápido controlado...');
                     await autoRegisterTerminal();
                 } catch (error) {
                     console.error('❌ Fast heartbeat failed:', error);
                 }
-            }, 5000); // 5 segundos
+            }, 15000); // 15 segundos en lugar de 5
             
-            // Volver a heartbeat normal después de 2 minutos
+            // Volver a heartbeat normal después de 1 minuto
             fastHeartbeatTimeout = setTimeout(() => {
-                console.log('🔄 Volviendo a heartbeat normal (30s)...');
+                console.log('🔄 Volviendo a heartbeat normal (45s)...');
                 clearInterval(fastInterval);
                 startNormalHeartbeat();
-            }, 2 * 60 * 1000); // 2 minutos
+            }, 60000); // 1 minuto
         };
         
-        // 💓 HEARTBEAT NORMAL (cada 30 segundos)
+        // 💓 HEARTBEAT NORMAL (cada 45 segundos)
         const startNormalHeartbeat = () => {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            
             heartbeatInterval = setInterval(async () => {
                 try {
-                    console.log('💓 Enviando heartbeat...');
+                    console.log('💓 Enviando heartbeat normal...');
                     const response = await fetch('/tas-coope/api/terminal-register');
                     const result = await response.json();
                     
                     // Procesar comandos en cada heartbeat
                     if (result.command) {
                         console.log(`📤 Nuevo comando en heartbeat: ${result.command}`);
-                        // Reiniciar ciclo con heartbeat rápido
-                        await autoRegisterTerminal();
+                        clearInterval(heartbeatInterval); // Detener heartbeat normal
+                        await autoRegisterTerminal(); // Procesar comando
                     }
                 } catch (error) {
-                    console.error('❌ Heartbeat failed:', error);
+                    console.error('❌ Heartbeat normal failed:', error);
                 }
-            }, 30000); // 30 segundos
+            }, 45000); // 45 segundos
         };
         
-        // Auto-registro inicial
-        autoRegisterTerminal();
+        // 🐌 HEARTBEAT LENTO PARA RECUPERACIÓN (cada 2 minutos)
+        const startSlowHeartbeat = () => {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            
+            console.log('🐌 Iniciando heartbeat de recuperación (120s)...');
+            
+            heartbeatInterval = setInterval(async () => {
+                try {
+                    console.log('🐌 Heartbeat de recuperación...');
+                    await autoRegisterTerminal();
+                } catch (error) {
+                    console.error('❌ Slow heartbeat failed:', error);
+                }
+            }, 120000); // 2 minutos
+        };
         
-        // Iniciar heartbeat normal
-        startNormalHeartbeat();
+        // 🔧 INICIALIZAR TODO CON DEMORAS
+        initializeTASCommandService();
+        
+        // Auto-registro inicial con demora
+        setTimeout(() => {
+            autoRegisterTerminal();
+        }, 2000); // 2 segundos de demora inicial
+        
+        // Heartbeat normal con demora mayor
+        setTimeout(() => {
+            startNormalHeartbeat();
+        }, 10000); // 10 segundos de demora
         
         // Cleanup al desmontar componente
         return () => {
@@ -297,20 +312,12 @@ export default function TASHomeScreen() {
         };
 
         const handleUserInteraction = () => {
-            // 🆕 VERIFICAR SI ESTÁ EN MANTENIMIENTO USANDO COMMAND SERVICE
-            if (typeof window !== 'undefined' && window.debugTAS) {
-                const status = window.debugTAS.getStatus();
-                if (status.maintenanceActive) {
-                    console.log('🔧 En modo mantenimiento - interacción bloqueada');
-                    return; // Bloquear interacción durante mantenimiento
-                }
-            }
-            
-            // También verificar si hay overlay de mantenimiento
-            const maintenanceOverlay = document.getElementById('maintenance-overlay');
+            // 🆕 VERIFICAR SI ESTÁ EN MANTENIMIENTO
+            const maintenanceOverlay = document.getElementById('maintenance-overlay') || 
+                                      document.getElementById('maintenance-overlay-fallback');
             if (maintenanceOverlay) {
-                console.log('🔧 Overlay de mantenimiento activo - interacción bloqueada');
-                return;
+                console.log('🔧 En modo mantenimiento - interacción bloqueada');
+                return; // Bloquear interacción durante mantenimiento
             }
             
             if (modoSuspendido) {
@@ -367,7 +374,6 @@ export default function TASHomeScreen() {
                     className='w-full h-full object-cover'
                     onError={(e) => {
                         console.log('❌ Error cargando GIF:', gifPath);
-                        // Fallback: mostrar texto si no carga la imagen
                         e.target.style.display = 'none';
                         e.target.parentElement.innerHTML = `
                             <div class="text-white text-center">
