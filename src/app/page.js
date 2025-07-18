@@ -1,4 +1,4 @@
-// src/app/page.js - VERSIÓN CON CONTROL DE RATE LIMITING
+// src/app/page.js - VERSIÓN CON TERMINAL ID DINÁMICO
 'use client';
 import { useState, useEffect } from 'react';
 import { createRoute } from '../utils/routeHelper';
@@ -7,20 +7,24 @@ export default function TASHomeScreen() {
     const [modoSuspendido, setModoSuspendido] = useState(true);
     const [mostrarBienvenida, setMostrarBienvenida] = useState(false);
 
-    // 🆕 AUTO-REGISTRO + CONTROL DE RATE LIMITING
+    // 🆕 AUTO-REGISTRO + CONTROL DE RATE LIMITING + TERMINAL ID DINÁMICO
     useEffect(() => {
         let heartbeatInterval;
         let fastHeartbeatTimeout;
         let rateLimitCount = 0;
         
+        // 🎯 VARIABLE DINÁMICA PARA TERMINAL ID
+        let currentTerminalId = null; // Se obtiene del auto-registro
+        
         // 🔧 INICIALIZAR TAS COMMAND SERVICE
-        const initializeTASCommandService = () => {
-            if (typeof window !== 'undefined') {
+        const initializeTASCommandService = (terminalId) => {
+            if (typeof window !== 'undefined' && terminalId) {
                 import('../services/tasCommandService.js').then((module) => {
                     const tasCommandService = module.default;
                     console.log('🔧 TAS Command Service inicializado:', tasCommandService);
                     
-                    tasCommandService.setTerminalId('VPN_25');
+                    // ✅ USAR TERMINAL ID DINÁMICO
+                    tasCommandService.setTerminalId(terminalId);
                     window.tasCommandService = tasCommandService;
                     tasCommandService.checkMaintenanceStatus();
                 }).catch(error => {
@@ -29,7 +33,7 @@ export default function TASHomeScreen() {
             }
         };
         
-        // 🔧 FUNCIÓN PARA CONFIRMAR COMANDO EJECUTADO
+        // 🔧 FUNCIÓN PARA CONFIRMAR COMANDO EJECUTADO (DINÁMICO)
         const confirmCommandExecution = async (commandId, success, errorMessage = null) => {
             console.log(`📤 Confirmando comando ${commandId}: ${success ? 'ÉXITO' : 'FALLO'}`);
             
@@ -42,7 +46,8 @@ export default function TASHomeScreen() {
                         success: success,
                         error_message: errorMessage,
                         execution_time: Date.now(),
-                        terminal_id: 'VPN_25'
+                        // ✅ USAR TERMINAL ID DINÁMICO CON FALLBACK
+                        terminal_id: currentTerminalId || 'UNKNOWN'
                     })
                 });
 
@@ -95,6 +100,21 @@ export default function TASHomeScreen() {
                 // 🎯 RESETEAR CONTADOR SI LA RESPUESTA ES EXITOSA
                 if (result.registered) {
                     rateLimitCount = 0; // Reset si funciona
+                    
+                    // ✅ CAPTURAR TERMINAL ID DINÁMICO
+                    if (result.terminal && result.terminal.id) {
+                        const detectedTerminalId = result.terminal.id;
+                        
+                        // Solo actualizar si cambió o es la primera vez
+                        if (currentTerminalId !== detectedTerminalId) {
+                            currentTerminalId = detectedTerminalId;
+                            console.log(`🎯 Terminal ID detectado dinámicamente: ${currentTerminalId}`);
+                            
+                            // Inicializar TAS Command Service con el ID correcto
+                            initializeTASCommandService(currentTerminalId);
+                        }
+                    }
+                    
                     console.log(`✅ Terminal registrada: ${result.terminal.id} (${result.terminal.location})`);
                     
                     // 🆕 PROCESAR COMANDO SI EXISTE
@@ -194,6 +214,7 @@ export default function TASHomeScreen() {
                         <p style="font-size: 24px; opacity: 0.9;">Disculpe las molestias ocasionadas</p>
                         <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 15px; margin-top: 40px;">
                             <p style="margin: 0; font-size: 18px;">✅ Comando ejecutado exitosamente</p>
+                            <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.7;">Terminal: ${currentTerminalId || 'UNKNOWN'}</p>
                             <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.7;">Command ID: ${commandId}</p>
                             <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.6;">Iniciado: ${new Date().toLocaleString('es-AR')}</p>
                         </div>
@@ -252,6 +273,14 @@ export default function TASHomeScreen() {
                     const response = await fetch('/tas-coope/api/terminal-register');
                     const result = await response.json();
                     
+                    // ✅ ACTUALIZAR TERMINAL ID SI CAMBIÓ
+                    if (result.registered && result.terminal && result.terminal.id) {
+                        if (currentTerminalId !== result.terminal.id) {
+                            currentTerminalId = result.terminal.id;
+                            console.log(`🔄 Terminal ID actualizado: ${currentTerminalId}`);
+                        }
+                    }
+                    
                     // Procesar comandos en cada heartbeat
                     if (result.command) {
                         console.log(`📤 Nuevo comando en heartbeat: ${result.command}`);
@@ -281,7 +310,7 @@ export default function TASHomeScreen() {
         };
         
         // 🔧 INICIALIZAR TODO CON DEMORAS
-        initializeTASCommandService();
+        // Ya no inicializamos TAS Command Service aquí - se hace cuando obtenemos el terminal ID
         
         // Auto-registro inicial con demora
         setTimeout(() => {
