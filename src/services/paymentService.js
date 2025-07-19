@@ -705,6 +705,190 @@ const submitPayment = async (paymentData, nis, metodoPago) => {
     return await response.json();
 };
 
+// ✅ FUNCIÓN DE POLLING MODO CON IMPRESIÓN AUTOMÁTICA (COPIADA DE MERCADOPAGO)
+const startModoPolling = async (
+    paymentData,
+    nis,
+    metodoPago,
+    cliente,
+    onSuccess,
+    onCancel
+) => {
+    console.log(
+        `🔄 Iniciando polling MODO para factura ${paymentData.factura}, NIS ${nis}, vencimiento ${paymentData.vencimiento}`
+    );
+
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutos (cada 5 segundos)
+    let estadoInicial = null;
+    let paymentIdInicial = null;
+
+    const pollInterval = setInterval(async () => {
+        attempts++;
+        console.log(
+            `🔄 Polling MODO intento ${attempts}/${maxAttempts} - Vencimiento ${paymentData.vencimiento}`
+        );
+
+        try {
+            const response = await fetch(`${baseUrl}/api/facturas?nis=${nis}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                },
+                cache: 'no-cache',
+            });
+
+            if (response.ok) {
+                const facturas = await response.json();
+                const facturaActual = facturas.find(
+                    (f) => (f.NROFACT || f.numero) == paymentData.factura
+                );
+
+                if (!facturaActual) {
+                    console.warn('⚠️ Factura no encontrada en polling MODO');
+                    return;
+                }
+
+                const estado = facturaActual.ESTADO;
+                const paymentId = facturaActual.payment_id;
+                const tienePago = paymentId !== null && paymentId !== '';
+
+                console.log(
+                    `📊 Polling MODO - Estado: ${estado}, Payment ID: ${paymentId}, Vencimiento: ${paymentData.vencimiento}`
+                );
+
+                // ✅ PRIMERA VEZ: GUARDAR ESTADO INICIAL
+                if (attempts === 1) {
+                    estadoInicial = estado;
+                    paymentIdInicial = paymentId;
+                    console.log(
+                        `📝 Estado inicial guardado - Estado: ${estadoInicial}, Payment ID: ${paymentIdInicial}`
+                    );
+                    return; // No verificar en el primer intento
+                }
+
+                // ✅ LÓGICA DIFERENTE SEGÚN VENCIMIENTO (IGUAL QUE MERCADOPAGO)
+                let pagoExitoso = false;
+
+                if (paymentData.vencimiento === '1') {
+                    // ✅ PRIMER VENCIMIENTO: Cambio a PARCIAL o EN PROCESO
+                    if (
+                        (estado === 'PARCIAL' || estado === 'EN PROCESO') &&
+                        tienePago &&
+                        estado !== estadoInicial
+                    ) {
+                        console.log(
+                            `✅ Primer vencimiento pagado MODO: ${estadoInicial} → ${estado}`
+                        );
+                        pagoExitoso = true;
+                    }
+                } else if (paymentData.vencimiento === '2') {
+                    // ✅ SEGUNDO VENCIMIENTO: Debe cambiar de PARCIAL a EN PROCESO
+                    if (
+                        estadoInicial === 'PARCIAL' &&
+                        estado === 'EN PROCESO' &&
+                        tienePago
+                    ) {
+                        console.log(
+                            `✅ Segundo vencimiento pagado MODO: PARCIAL → EN PROCESO`
+                        );
+                        pagoExitoso = true;
+                    }
+                    // O si el payment_id cambió (nuevo pago)
+                    else if (
+                        paymentId &&
+                        paymentId !== paymentIdInicial &&
+                        estado === 'EN PROCESO'
+                    ) {
+                        console.log(
+                            `✅ Segundo vencimiento pagado MODO: Nuevo payment_id ${paymentIdInicial} → ${paymentId}`
+                        );
+                        pagoExitoso = true;
+                    }
+                }
+
+                if (pagoExitoso) {
+                    console.log('✅ Pago MODO exitoso detectado');
+                    clearInterval(pollInterval);
+
+                    // ✅ IMPRIMIR TICKET DE ÉXITO AUTOMÁTICAMENTE
+                    await imprimirTicketExito(
+                        paymentData,
+                        nis,
+                        cliente,
+                        metodoPago,
+                        paymentId
+                    );
+
+                    // Esperar un momento para mostrar la confirmación visual
+                    setTimeout(async () => {
+                        if (onSuccess) {
+                            await onSuccess();
+                        }
+                    }, 1500);
+                    return;
+                }
+
+                if (estado === 'RECHAZADA') {
+                    console.log('❌ Pago MODO rechazado');
+                    clearInterval(pollInterval);
+
+                    // ✅ IMPRIMIR TICKET DE FALLO
+                    await imprimirTicketFallo(
+                        paymentData,
+                        nis,
+                        cliente,
+                        metodoPago,
+                        'Pago rechazado por el proveedor'
+                    );
+
+                    Swal.close();
+                    await showErrorAlert(
+                        'Pago rechazado',
+                        'El pago no pudo ser procesado. Intenta nuevamente.'
+                    );
+
+                    if (onCancel) onCancel();
+                    return;
+                }
+            } else {
+                console.error(
+                    `❌ Error en polling MODO: ${response.status} ${response.statusText}`
+                );
+            }
+
+            // ✅ TIMEOUT
+            if (attempts >= maxAttempts) {
+                console.log('⏰ Timeout alcanzado para MODO');
+                clearInterval(pollInterval);
+
+                // ✅ IMPRIMIR TICKET DE TIMEOUT
+                await imprimirTicketFallo(
+                    paymentData,
+                    nis,
+                    cliente,
+                    metodoPago,
+                    'Tiempo de espera agotado'
+                );
+
+                Swal.close();
+                await showInfoAlert(
+                    'Tiempo agotado',
+                    'El tiempo de espera ha expirado. Verifica el estado de tu pago.'
+                );
+
+                if (onCancel) onCancel();
+            }
+        } catch (error) {
+            console.error('❌ Error en polling MODO:', error);
+        }
+    }, 5000); // Cada 5 segundos (igual que MercadoPago)
+
+    // Cleanup si se cancela
+    return () => clearInterval(pollInterval);
+};
+
 // ===== FUNCIÓN PRINCIPAL CON IMPRESIÓN INTEGRADA =====
 export const processPayment = async (
     paymentData,
@@ -823,16 +1007,17 @@ export const processPayment = async (
                 }
             );
         } else if (metodoPago === 'modo') {
-            // ===== MODO CON IMPRESIÓN =====
+            // ===== MODO CON LÓGICA COPIADA DE MERCADOPAGO =====
             if (!response.qr) {
                 throw new Error('El QR de MODO no fue generado correctamente');
             }
 
             console.log(
-                '🔄 Mostrando QR de MODO e iniciando polling:',
+                '🔄 Mostrando QR MODO con polling personalizado:',
                 paymentId
             );
 
+            // ✅ MOSTRAR QR DE MODO
             showModoQR(response, async () => {
                 console.log('❌ Usuario canceló QR MODO:', paymentId);
 
@@ -848,24 +1033,15 @@ export const processPayment = async (
                 if (onPaymentCancel) onPaymentCancel();
             });
 
-            const isSecondVencimiento = paymentData.vencimiento !== '1';
-
-            // ✅ POLLING MODO CON CALLBACKS MODIFICADOS PARA IMPRESIÓN
-            startPolling(
-                paymentData.factura,
+            // ✅ INICIAR POLLING MODO CON LÓGICA IDÉNTICA A MERCADOPAGO
+            startModoPolling(
+                paymentData,
                 nis,
+                metodoPago,
+                cliente,
+                // onSuccess
                 async () => {
                     console.log('✅ Pago MODO confirmado:', paymentId);
-
-                    // ✅ IMPRIMIR TICKET DE ÉXITO AUTOMÁTICAMENTE
-                    await imprimirTicketExito(
-                        paymentData,
-                        nis,
-                        cliente,
-                        metodoPago,
-                        paymentId
-                    );
-
                     await refreshFacturasState(nis);
                     if (onPaymentSuccess) onPaymentSuccess();
                     Swal.close();
@@ -875,20 +1051,8 @@ export const processPayment = async (
                     );
                     window.location.reload();
                 },
-                isSecondVencimiento,
-                // ✅ CALLBACK DE ERROR PARA MODO
-                async (errorReason) => {
-                    console.log('❌ Error en pago MODO:', errorReason);
-
-                    // ✅ IMPRIMIR TICKET DE FALLO
-                    await imprimirTicketFallo(
-                        paymentData,
-                        nis,
-                        cliente,
-                        metodoPago,
-                        errorReason || 'Error en el procesamiento'
-                    );
-
+                // onCancel
+                () => {
                     if (onPaymentCancel) onPaymentCancel();
                 }
             );
