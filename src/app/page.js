@@ -530,7 +530,7 @@ export default function TASHomeScreen() {
 
                         {/* Botón Imprimir Formularios */}
                         <button
-                            onClick={irAImprimirFormularios}
+                            //onClick={irAImprimirFormularios}
                             className='group relative bg-gradient-to-br from-blue-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 p-8 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 active:scale-95 border-4 border-blue-500 hover:border-cyan-400'
                         >
                             <div className='text-center'>

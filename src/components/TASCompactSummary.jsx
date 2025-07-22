@@ -9,7 +9,7 @@ export default function TASCompactSummary({
     return (
         <div className='mb-6'>
             {/* Header con información del cliente */}
-            <div className='grid grid-cols-3 gap-4'>
+            <div className='grid grid-cols-2 gap-4'>
                 {/* Información del Cliente */}
                 <div className='bg-white/20 backdrop-blur-sm rounded-2xl p-4 border border-white/30'>
                     <h3 className='text-emerald-200 text-sm uppercase tracking-wide mb-1'>
@@ -32,7 +32,7 @@ export default function TASCompactSummary({
                 </div>
 
                 {/* Próximo Vencimiento */}
-                <div className='bg-orange-500/30 backdrop-blur-sm rounded-2xl p-4 border border-orange-400/50'>
+                {/* <div className='bg-orange-500/30 backdrop-blur-sm rounded-2xl p-4 border border-orange-400/50'>
                     <h3 className='text-orange-200 text-sm uppercase tracking-wide mb-1'>
                         PRÓXIMO VENCIMIENTO
                     </h3>
@@ -53,7 +53,7 @@ export default function TASCompactSummary({
                             Sin pendientes
                         </p>
                     )}
-                </div>
+                </div> */}
             </div>
         </div>
     );
