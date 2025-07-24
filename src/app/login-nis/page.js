@@ -362,7 +362,7 @@ export default function LoginNISPage() {
                             onClick={() => cambiarCampo('nis')}
                         >
                             <label className='block text-lg font-semibold mb-2 text-lime-200'>
-                                📍 INGRESE SU NÚMERO DE SUMINISTRO
+                                📍 INGRESE SU NÚMERO DE SOCIO
                             </label>
                             <div className='text-2xl font-mono bg-black/30 p-4 rounded-lg border-2 border-green-600'>
                                 {nis ||
@@ -390,7 +390,7 @@ export default function LoginNISPage() {
                             onClick={() => cambiarCampo('socio')}
                         >
                             <label className='block text-lg font-semibold mb-2 text-lime-200'>
-                                👤 INGRESE SU NÚMERO DE SOCIO
+                                👤 INGRESE SU NÚMERO DE SUMINISTRO
                             </label>
                             <div className='text-2xl font-mono bg-black/30 p-4 rounded-lg border-2 border-green-600'>
                                 {socio ||
