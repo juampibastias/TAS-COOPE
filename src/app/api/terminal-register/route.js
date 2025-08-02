@@ -13,8 +13,8 @@ function getClientIP(request) {
     // Si no hay headers, usar la IP de la conexión
     if (!detectedIP) {
         // Para Next.js en VPN, necesitamos detectar la IP real del terminal
-        // En este caso, el terminal TAS tiene IP VPN 10.10.5.25
-        detectedIP = '10.10.5.25';  // 🔧 IP VPN del terminal TAS
+        // En este caso, el terminal TAS tiene IP VPN 10.10.5.21
+        detectedIP = '10.10.5.21';
     }
     
     // Limpiar formato IPv6 a IPv4
@@ -27,8 +27,8 @@ function getClientIP(request) {
 
 // Mapeo de IPs VPN a ubicaciones
 const VPN_LOCATIONS = {
-    '10.10.5.25': 'Cooperativa',           // 🎯 NUESTRO TERMINAL TAS
-    //'10.10.5.222': 'TAS Server Principal', // Servidor webapp
+    '10.10.5.21': 'Cooperativa Original',
+    '10.10.5.222': 'TAS Server Principal',
 };
 
 export async function GET(request) {

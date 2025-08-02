@@ -7,6 +7,10 @@ export default function TASHomeScreen() {
     const [modoSuspendido, setModoSuspendido] = useState(true);
     const [mostrarBienvenida, setMostrarBienvenida] = useState(false);
 
+    const logoPath = process.env.NODE_ENV === 'production' 
+    ? '/tas-coope/logo.png' 
+    : '/logo.png';
+
     // 🆕 AUTO-REGISTRO + CONTROL DE RATE LIMITING + TERMINAL ID DINÁMICO
     useEffect(() => {
         let heartbeatInterval;
@@ -425,10 +429,10 @@ export default function TASHomeScreen() {
                     <div className='mb-6'>
                         <div className='w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-6'>
                             <img
-                                src='/LOGO.png'
-                                alt='Logo Cooperativa'
-                                className='w-full h-full object-contain'
-                            />
+    src={logoPath}  // Cambiar de '/logo.png' a {logoPath}
+    alt='logocooperativa'
+    className='w-full h-full object-contain'
+/>
                         </div>
                     </div>
                     <h1 className='text-5xl font-bold mb-4'>BIENVENIDO</h1>
@@ -451,10 +455,10 @@ export default function TASHomeScreen() {
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-4'>
                         <img
-                            src='/LOGO.png'
-                            alt='Logo Cooperativa'
-                            className='h-16 w-auto object-contain'
-                        />
+    src={logoPath}  // Cambiar de '/logo.png' a {logoPath}
+    alt='logocooperativa'
+    className='h-16 w-auto object-contain'
+/>
                     </div>
                     <div className='text-center'>
                         <h1 className='text-3xl font-bold'>
@@ -569,7 +573,7 @@ export default function TASHomeScreen() {
                         <span>Conexión segura</span>
                     </div>
                     <div className='flex items-center gap-6'>
-                        <span>📞 Mesa de ayuda: 0800-COOPE</span>
+                        {/* <span>📞 Mesa de ayuda: 0800-COOPE</span> */}
                         <span>🕐 Horario: 24hs</span>
                     </div>
                     <div className='text-sm'>

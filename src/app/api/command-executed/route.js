@@ -23,18 +23,8 @@ function getClientIP(request) {
 
 // Mapeo de IPs VPN a ubicaciones (debe coincidir con terminal-register)
 const VPN_LOCATIONS = {
-    '10.10.5.25': 'Cooperativa',
-    '10.10.5.26': 'Disponible para uso', 
-    '10.10.5.27': 'Disponible para uso',
-    '10.10.5.28': 'Disponible para uso',
-    '10.10.5.29': 'Disponible para uso',
-    '10.10.5.30': 'Disponible para uso',
-    '10.10.5.31': 'Disponible para uso',
-    '10.10.5.32': 'Disponible para uso',
-    '10.10.5.33': 'Disponible para uso',
-    '10.10.5.34': 'Disponible para uso',
-    '10.10.5.35': 'Disponible para uso',
-    '10.10.5.222': 'TAS Server Principal'
+    '10.10.5.21': 'Cooperativa Original',
+    '10.10.5.222': 'TAS Server Principal',
 };
 
 export async function POST(request) {
