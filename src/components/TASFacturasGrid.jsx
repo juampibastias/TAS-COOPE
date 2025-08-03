@@ -195,13 +195,14 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
 
     // ✅ GENERAR VENCIMIENTOS DISPONIBLES (lógica copiada exacta)
     const vencimientosDisponibles = useMemo(() => {
-        const vencimientos = [];
-        
+    const vencimientos = [];
+
+    try {
         if (!facturasImpagas || !Array.isArray(facturasImpagas)) return vencimientos;
-        
+
         facturasImpagas.forEach(factura => {
             if (!factura || typeof factura !== 'object') return;
-            
+
             const nroFactura = factura.NROFACT || factura.nrofact || factura.numero || 'SIN_NUMERO';
             const estado = factura.ESTADO || factura.estado || factura.status || '';
             const cta1Imp = parseFloat(factura.CTA1_IMP || factura.cta1_imp || factura.importe1 || 0);
@@ -246,13 +247,18 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
             }
         });
 
-        // Ordenar por fecha de vencimiento
         return vencimientos.sort((a, b) => {
             const fechaA = parsearFecha(a.fecha);
             const fechaB = parsearFecha(b.fecha);
             return fechaA - fechaB;
         });
-    }, [facturasImpagas]);
+
+    } catch (error) {
+        console.error('Error al calcular vencimientos disponibles:', error);
+        return vencimientos;
+    }
+}, [facturasImpagas]);
+
 
     // ✅ FUNCIÓN PARA PARSEAR FECHAS
     const parsearFecha = useCallback((fechaString) => {
@@ -641,6 +647,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                     html: `
                         <div style="text-align: center; padding: 40px; font-size: 20px;">
                             <p style="font-size: 28px; margin-bottom: 30px;">
+                                No se pudo procesar ningún p<p style="font-size: 28px; margin-bottom: 30px;">
                                 No se pudo procesar ningún pago
                             </p>
                             <p style="font-size: 22px; color: #6b7280;">
