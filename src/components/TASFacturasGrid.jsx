@@ -480,234 +480,29 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
         }
     }, [selectedVencimientos, nis, validatePaymentOrder, vencimientosDisponibles]);
 
-    // ✅ PROCESAR PAGO MÚLTIPLE
-    const handlePagar = useCallback(async () => {
-        if (selectedVencimientos.length === 0) return;
+    // REEMPLAZAR TODA la función handlePagar con esto:
+const handlePagar = useCallback(async () => {
+    if (selectedVencimientos.length === 0) return;
 
-        const total = selectedVencimientos.reduce((sum, v) => sum + parseFloat(v.amount || 0), 0);
-
-        // Confirmación
-        const confirmResult = await Swal.fire({
-            icon: 'question',
-            title: 'Confirmar pagos',
-            html: `
-                <div style="text-align: center; padding: 30px; font-size: 20px;">
-                    <p style="font-size: 28px; margin-bottom: 30px;">¿Confirma el pago de <b>${selectedVencimientos.length}</b> vencimientos?</p>
-                    <p style="font-size: 42px; font-weight: bold; color: #059669; margin-bottom: 30px;">
-                        TOTAL: $${total.toLocaleString('es-AR')}
-                    </p>
-                    <div style="font-size: 22px; color: #6b7280;">
-                        ${selectedVencimientos.map(v => `Factura ${v.factura} (${v.tipo})`).join('<br>')}
-                    </div>
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: 'SÍ, PAGAR',
-            cancelButtonText: 'CANCELAR',
-            confirmButtonColor: '#059669',
-            cancelButtonColor: '#dc2626',
-            customClass: {
-                popup: 'rounded-xl shadow-2xl',
-                confirmButton: 'text-2xl font-bold py-4 px-8 rounded-lg',
-                cancelButton: 'text-2xl font-bold py-4 px-8 rounded-lg'
-            }
-        });
-
-        if (!confirmResult.isConfirmed) return;
-
+    // ✅ USAR LA LÓGICA QUE FUNCIONA
+    try {
         setIsProcessing(true);
-
-        // Mostrar progreso
-        Swal.fire({
-            title: 'Procesando pagos...',
-            html: `
-                <div style="text-align: center; padding: 30px; font-size: 20px;">
-                    <div style="font-size: 28px; margin-bottom: 30px;">Procesando <b>${selectedVencimientos.length}</b> vencimientos</div>
-                    <div style="font-size: 22px; color: #6b7280;">Por favor espere...</div>
-                </div>
-            `,
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            showConfirmButton: false,
-            customClass: {
-                popup: 'rounded-xl shadow-2xl'
-            },
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-
-        try {
-            const results = [];
-            
-            // Procesar cada vencimiento secuencialmente
-            for (const vencimiento of selectedVencimientos) {
-                try {
-                    const paymentData = {
-                        factura: vencimiento.factura,
-                        vencimiento: vencimiento.tipo === '1° VENCIMIENTO' ? '1' : '2',
-                        fecha: vencimiento.vencimiento,
-                        importe: vencimiento.amount.toString(),
-                    };
-
-                    console.log(`Procesando pago: Factura ${vencimiento.factura}, Vencimiento ${paymentData.vencimiento}`);
-                    
-                    await processPayment(paymentData, nis);
-                    results.push({ 
-                        success: true, 
-                        factura: vencimiento.factura, 
-                        vencimiento: paymentData.vencimiento,
-                        importe: vencimiento.amount,
-                        transactionId: `PAY_${Date.now()}_${vencimiento.factura}_${paymentData.vencimiento}`
-                    });
-                    
-                } catch (error) {
-                    console.error(`Error procesando factura ${vencimiento.factura}:`, error);
-                    results.push({ 
-                        success: false, 
-                        factura: vencimiento.factura, 
-                        vencimiento: vencimiento.tipo === '1° VENCIMIENTO' ? '1' : '2',
-                        error: error.message 
-                    });
-                }
-            }
-
-            const exitosos = results.filter(r => r.success);
-            const fallidos = results.filter(r => !r.success);
-
-            if (exitosos.length === selectedVencimientos.length) {
-                // ✅ IMPRIMIR TICKET MÚLTIPLE
-                if (exitosos.length > 1) {
-                    const cliente = { NOMBRE: 'Cliente' }; // Aquí puedes obtener el cliente real
-                    await imprimirTicketMultiple(exitosos, nis, cliente);
-                }
-
-                // Todos exitosos
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Pagos realizados exitosamente!',
-                    html: `
-                        <div style="text-align: center; padding: 40px; font-size: 20px;">
-                            <p style="font-size: 32px; margin-bottom: 30px; color: #059669; font-weight: bold;">
-                                Todos los pagos fueron procesados
-                            </p>
-                            <p style="font-size: 28px; margin-bottom: 30px;">
-                                Total pagado: <strong>$${total.toLocaleString('es-AR')}</strong>
-                            </p>
-                            <p style="font-size: 24px; color: #6b7280;">
-                                ${exitosos.length} vencimientos procesados correctamente
-                            </p>
-                            <p style="font-size: 22px; color: #059669; margin-top: 20px;">
-                                🖨️ Ticket impreso automáticamente
-                            </p>
-                        </div>
-                    `,
-                    confirmButtonText: 'CONTINUAR',
-                    confirmButtonColor: '#059669',
-                    allowOutsideClick: false,
-                    customClass: {
-                        popup: 'rounded-xl shadow-2xl',
-                        confirmButton: 'text-2xl font-bold py-4 px-8 rounded-lg'
-                    }
-                }).then(() => {
-                    window.location.reload();
-                });
-            } else if (exitosos.length > 0) {
-                // Algunos exitosos
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Pagos procesados parcialmente',
-                    html: `
-                        <div style="text-align: center; padding: 40px; font-size: 20px;">
-                            <p style="font-size: 28px; color: #059669; margin-bottom: 15px;">
-                                ✅ Procesados exitosamente: <b>${exitosos.length}</b>
-                            </p>
-                            <p style="font-size: 28px; color: #dc2626; margin-bottom: 30px;">
-                                ❌ Con errores: <b>${fallidos.length}</b>
-                            </p>
-                            <p style="font-size: 22px; color: #6b7280;">
-                                Algunos vencimientos no se pudieron procesar
-                            </p>
-                        </div>
-                    `,
-                    confirmButtonText: 'ENTENDIDO',
-                    confirmButtonColor: '#059669',
-                    customClass: {
-                        popup: 'rounded-xl shadow-2xl',
-                        confirmButton: 'text-2xl font-bold py-4 px-8 rounded-lg'
-                    }
-                }).then(() => {
-                    window.location.reload();
-                });
-            } else {
-                // Todos fallidos
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error en los pagos',
-                    html: `
-                        <div style="text-align: center; padding: 40px; font-size: 20px;">
-                            <p style="font-size: 28px; margin-bottom: 30px;">
-                                No se pudo procesar ningún p<p style="font-size: 28px; margin-bottom: 30px;">
-                                No se pudo procesar ningún pago
-                            </p>
-                            <p style="font-size: 22px; color: #6b7280;">
-                                Por favor intente nuevamente o contacte soporte
-                            </p>
-                        </div>
-                    `,
-                    confirmButtonText: 'INTENTAR NUEVAMENTE',
-                    confirmButtonColor: '#dc2626',
-                    customClass: {
-                        popup: 'rounded-xl shadow-2xl',
-                        confirmButton: 'text-2xl font-bold py-4 px-8 rounded-lg'
-                    }
-                });
-            }
-
-        } catch (error) {
-            console.error('Error general en el procesamiento:', error);
-            
-            Swal.fire({
-                icon: 'error',
-                title: 'Error del sistema',
-                html: `
-                    <div style="text-align: center; padding: 40px; font-size: 20px;">
-                        <p style="font-size: 28px; margin-bottom: 30px;">
-                            Error inesperado del sistema
-                        </p>
-                        <p style="font-size: 22px; color: #6b7280;">
-                            ${error.message || 'Error desconocido'}
-                        </p>
-                    </div>
-                `,
-                confirmButtonText: 'ENTENDIDO',
-                confirmButtonColor: '#dc2626',
-                customClass: {
-                    popup: 'rounded-xl shadow-2xl',
-                    confirmButton: 'text-2xl font-bold py-4 px-8 rounded-lg'
-                }
-            });
-        } finally {
-            setIsProcessing(false);
-        }
-    }, [selectedVencimientos, nis]);
-
-    // ✅ RENDER PRINCIPAL
-    if (!vencimientosDisponibles || vencimientosDisponibles.length === 0) {
-        return (
-            <div className="w-full max-w-4xl mx-auto p-6">
-                <div className="text-center py-20">
-                    <div className="text-6xl mb-6">✅</div>
-                    <div className="text-4xl font-bold text-green-600 mb-4">
-                        ¡No hay vencimientos pendientes!
-                    </div>
-                    <div className="text-2xl text-gray-600">
-                        Todas las facturas están al día
-                    </div>
-                </div>
-            </div>
-        );
+        
+        // Importar la función que funciona
+        const { procesarPagoMultiple } = await import('../services/sharedMultiplePaymentService');
+        
+        // Llamar con los datos correctos
+        const resultado = await procesarPagoMultiple(selectedVencimientos, nis, process.env.NEXT_PUBLIC_API_URL);
+        
+        console.log('✅ Resultado:', resultado);
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error: ' + error.message);
+    } finally {
+        setIsProcessing(false);
     }
+}, [selectedVencimientos, nis]);
 
     return (
         <div className="w-full max-w-4xl mx-auto p-4">
