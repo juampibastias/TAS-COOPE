@@ -1,376 +1,530 @@
-// src/services/multiplePaymentPrintService.js
-// ✅ NUEVA EXTENSIÓN - NO TOCA EL CÓDIGO EXISTENTE
+// multiplePaymentPrintService.js - Servicio optimizado para impresión de pagos múltiples
 
-import { imprimirTicketDesdeNavegador } from './browserPrintService';
+import Swal from 'sweetalert2';
 
-// 🎯 DETECTAR SI ES PAGO MÚLTIPLE
-export const isMultiplePayment = (paymentsArray) => {
-    return Array.isArray(paymentsArray) && paymentsArray.length > 1;
-};
-
-// 🎫 GENERAR TICKET CONSOLIDADO PARA MÚLTIPLES PAGOS - COMPATIBLE CON servidor-simple.js
-export const prepararDatosTicketMultiple = (paymentsData, nis, cliente) => {
-    const fechaActual = new Date();
-    const totalImporte = paymentsData.reduce((sum, payment) => {
-        return sum + parseFloat(payment.importe || 0);
-    }, 0);
-
-    // 🔥 FORMATO EXACTO QUE ESPERA TU servidor-simple.js
-    return {
-        // ✅ Campos que tu servidor-simple.js ya maneja:
-        cliente: cliente?.NOMBRE || 'Cliente',
-        nis: nis,
-        factura: `MULTIPLE-${paymentsData.length}`, // Tu servidor usa datos.factura
-        fecha: fechaActual.toLocaleDateString('es-AR'), // Tu servidor usa datos.fecha
-        importe: totalImporte.toString(), // Tu servidor usa datos.importe
-        vencimiento: `${paymentsData.length} VTO_MULTI`, // Tu servidor limpia con .replace('VTO_', '')
-        metodoPago: paymentsData[0]?.metodoPago || 'MODO', // Tu servidor usa datos.metodoPago
-        transaccion: `MULTI_${Date.now()}`, // Tu servidor usa datos.transaccion
-        
-        // 🆕 DATOS ADICIONALES PARA EL DETALLE (que tu servidor ignorará si no los usa)
-        isMultiple: true,
-        vencimientosDetalle: paymentsData.map(payment => ({
-            factura: payment.factura,
-            vencimiento: payment.vencimiento === '1' ? '1°' : '2°',
-            fecha: payment.fecha,
-            importe: parseFloat(payment.importe),
-            transactionId: payment.transactionId || 'N/A'
-        })),
-        totalVencimientos: paymentsData.length,
-        
-        // ✅ Para mostrar detalle en el ticket (opcional)
-        detalleFacturas: paymentsData.map(p => 
-            `Fact: ${p.factura} (${p.vencimiento}° venc) - ${parseFloat(p.importe).toLocaleString()}`
-        ).join('\n'),
-        
-        // Metadatos VPN (mantener compatibilidad con browserPrintService)
-        viaVPN: true,
-        remoteTAS: '10.10.5.25',
-        terminalId: localStorage.getItem('tas_terminal_id'),
-        timestamp: new Date().toISOString()
-    };
-};
-
-// 🖨️ FUNCIÓN PRINCIPAL PARA IMPRIMIR MÚLTIPLES (USA LA INFRAESTRUCTURA EXISTENTE)
-export const imprimirTicketMultiple = async (paymentsData, nis, cliente) => {
+/**
+ * Detecta si el servidor local de impresión TAS está disponible
+ */
+export async function isLocalPrintServerAvailable() {
     try {
-        console.log('🎫 Iniciando impresión de ticket múltiple:', paymentsData);
-
-        // Preparar datos del ticket consolidado
-        const datosTicketMultiple = prepararDatosTicketMultiple(paymentsData, nis, cliente);
-
-        // 🔥 USAR LA FUNCIÓN EXISTENTE - NO TOCAR NADA
-        await imprimirTicketDesdeNavegador(datosTicketMultiple);
-
-        console.log('✅ Ticket múltiple impreso exitosamente');
-        return true;
-
+        const response = await fetch('http://localhost:9100/estado', {
+            method: 'GET',
+            timeout: 2000
+        });
+        return response.ok;
     } catch (error) {
-        console.error('❌ Error al imprimir ticket múltiple:', error);
-        
-        // Fallback: Imprimir tickets individuales usando el sistema existente
-        console.log('🔄 Fallback: Imprimiendo tickets individuales...');
-        
-        for (const payment of paymentsData) {
-            try {
-                const datosIndividual = {
-                    cliente: cliente?.NOMBRE || 'Cliente',
-                    nis: nis,
-                    factura: payment.factura,
-                    fecha: payment.fecha,
-                    importe: payment.importe,
-                    vencimiento: payment.vencimiento === '1' ? '1° Vencimiento' : '2° Vencimiento',
-                    metodoPago: payment.metodoPago || 'MODO',
-                    transactionId: payment.transactionId || `IND_${Date.now()}`,
-                    fechaPago: new Date().toLocaleString('es-AR'),
-                };
-
-                // Usar sistema existente para cada ticket individual
-                await imprimirTicketDesdeNavegador(datosIndividual);
-                
-                // Pequeña pausa entre impresiones
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-            } catch (individualError) {
-                console.error(`❌ Error imprimiendo ticket individual ${payment.factura}:`, individualError);
-            }
-        }
-        
+        console.log('🖨️ Servidor local no disponible:', error.message);
         return false;
     }
-};
+}
 
-// 🔧 EXTENSIÓN DEL BROWSERPRINT SERVICE - SOLO PARA FORMATO MÚLTIPLE
-export const generarContenidoTicketMultiple = (datosTicket) => {
-    if (!datosTicket.isMultiple) {
-        // Si no es múltiple, que use la función original
-        return null;
+/**
+ * Prepara los datos para un ticket de pago múltiple
+ */
+export function prepararDatosTicketMultiple(selectedItems, nis, clienteNombre, metodoPago, transactionId) {
+    const ahora = new Date();
+    const totalImporte = selectedItems.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+    
+    // Agrupar por factura para el detalle
+    const facturaGroups = {};
+    selectedItems.forEach(item => {
+        if (!facturaGroups[item.factura]) {
+            facturaGroups[item.factura] = [];
+        }
+        facturaGroups[item.factura].push(item);
+    });
+
+    // Generar detalle de facturas
+    const detalleFacturas = Object.keys(facturaGroups).map(facturaNum => {
+        const vencimientos = facturaGroups[facturaNum];
+        const lineas = vencimientos.map(v => 
+            `  ${v.tipo}: $${parseFloat(v.amount).toLocaleString()}`
+        );
+        return `Factura ${facturaNum}:\n${lineas.join('\n')}`;
+    }).join('\n\n');
+
+    // Generar resumen por tipo de vencimiento
+    const primerosVencimientos = selectedItems.filter(item => item.tipo === '1° Vencimiento');
+    const segundosVencimientos = selectedItems.filter(item => item.tipo === '2° Vencimiento');
+
+    let resumenTipos = '';
+    if (primerosVencimientos.length > 0) {
+        const totalPrimeros = primerosVencimientos.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+        resumenTipos += `${primerosVencimientos.length} Primeros Vencimientos: $${totalPrimeros.toLocaleString()}\n`;
+    }
+    if (segundosVencimientos.length > 0) {
+        const totalSegundos = segundosVencimientos.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+        resumenTipos += `${segundosVencimientos.length} Segundos Vencimientos: $${totalSegundos.toLocaleString()}`;
     }
 
-    // Template especial para tickets múltiples
-    const template = `
-================================
-       COOPERATIVA POPULAR
-      COMPROBANTE DE PAGO
-================================
-
-CLIENTE:
-${datosTicket.cliente}
-NIS: ${datosTicket.nis}
-================================
-
-🎫 PAGO MÚLTIPLE (${datosTicket.totalVencimientos} vencimientos)
-
-${datosTicket.vencimientosDetalle.map((detalle, index) => `
-FACTURA ${index + 1}:
-- Número: ${detalle.factura}
-- Vencimiento: ${detalle.vencimiento}
-- Fecha: ${detalle.fecha}
-- Importe: $${detalle.importe.toLocaleString()}
-- ID: ${detalle.transactionId}
-`).join('')}
-================================
-
-RESUMEN:
-Método: ${datosTicket.metodoPago}
-Fecha: ${datosTicket.fechaPago}
-Total Vencimientos: ${datosTicket.totalVencimientos}
-
-      IMPORTE TOTAL PAGADO
-      $${parseFloat(datosTicket.importe).toLocaleString()}
-================================
-
-   PAGO PROCESADO EXITOSAMENTE
-       Gracias por su pago
-
-      ${datosTicket.fechaPago}
-
-
-`;
-
-    return template;
-};
-
-// ==============================
-// 🔧 MODIFICACIÓN MÍNIMA AL TASFacturasGrid.jsx
-// ==============================
-
-// Solo agregar esta función al componente existente:
-export const integrarPagoMultipleEnGrid = () => {
-    // Esta función se llamaría desde TASFacturasGrid cuando detecte múltiples pagos
-
-    const handlePagoMultiple = async (selectedVencimientos, nis, cliente) => {
-        try {
-            console.log('🔄 Procesando pago múltiple:', selectedVencimientos);
-
-            // 1. Procesar cada pago usando la lógica EXISTENTE
-            const results = [];
-            
-            for (const vencimiento of selectedVencimientos) {
-                try {
-                    const paymentData = {
-                        factura: vencimiento.factura,
-                        vencimiento: vencimiento.vencimiento.toString(),
-                        fecha: vencimiento.fecha,
-                        importe: vencimiento.amount.toString(),
-                    };
-
-                    // 🔥 USAR FUNCIÓN EXISTENTE - NO CAMBIAR NADA
-                    await processPayment(paymentData, nis);
-                    
-                    results.push({ 
-                        success: true, 
-                        ...vencimiento,
-                        transactionId: `PAY_${Date.now()}_${vencimiento.factura}`
-                    });
-                    
-                } catch (error) {
-                    console.error(`Error procesando ${vencimiento.factura}:`, error);
-                    results.push({ success: false, ...vencimiento, error: error.message });
-                }
-            }
-
-            // 2. Solo si todos fueron exitosos, imprimir ticket múltiple
-            const exitosos = results.filter(r => r.success);
-            
-            if (exitosos.length === selectedVencimientos.length) {
-                // Todos exitosos - imprimir ticket consolidado
-                console.log('✅ Todos los pagos exitosos, imprimiendo ticket múltiple...');
-                
-                await imprimirTicketMultiple(exitosos, nis, cliente);
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: '🎫 ¡Pagos realizados exitosamente!',
-                    html: `
-                        <div style="text-align: center; padding: 20px;">
-                            <p style="font-size: 24px; margin-bottom: 20px; color: #059669;">
-                                ${exitosos.length} vencimientos procesados
-                            </p>
-                            <p style="font-size: 20px; margin-bottom: 15px;">
-                                Total pagado: <strong>$${exitosos.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}</strong>
-                            </p>
-                            <p style="font-size: 18px; color: #6b7280;">
-                                🖨️ Ticket múltiple impreso automáticamente
-                            </p>
-                        </div>
-                    `,
-                    confirmButtonText: 'CONTINUAR',
-                    confirmButtonColor: '#059669',
-                    allowOutsideClick: false,
-                }).then(() => {
-                    window.location.reload();
-                });
-                
-            } else if (exitosos.length > 0) {
-                // Parcialmente exitosos - tickets individuales solo para exitosos
-                console.log('⚠️ Pagos parcialmente exitosos, imprimiendo individuales...');
-                
-                // Imprimir solo los exitosos usando sistema existente
-                for (const exitoso of exitosos) {
-                    const datosIndividual = {
-                        cliente: cliente?.NOMBRE || 'Cliente',
-                        nis: nis,
-                        factura: exitoso.factura,
-                        fecha: exitoso.fecha,
-                        importe: exitoso.amount.toString(),
-                        vencimiento: exitoso.vencimiento === 1 ? '1° Vencimiento' : '2° Vencimiento',
-                        metodoPago: 'MODO',
-                        transactionId: exitoso.transactionId,
-                        fechaPago: new Date().toLocaleString('es-AR'),
-                    };
-
-                    await imprimirTicketDesdeNavegador(datosIndividual);
-                }
-                
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Pagos procesados parcialmente',
-                    html: `
-                        <div style="text-align: center; padding: 20px;">
-                            <p style="font-size: 20px; color: #059669; margin-bottom: 10px;">
-                                ✅ Exitosos: ${exitosos.length}
-                            </p>
-                            <p style="font-size: 20px; color: #dc2626; margin-bottom: 15px;">
-                                ❌ Con errores: ${results.length - exitosos.length}
-                            </p>
-                            <p style="font-size: 16px; color: #6b7280;">
-                                🖨️ Tickets impresos solo para pagos exitosos
-                            </p>
-                        </div>
-                    `,
-                    confirmButtonText: 'ENTENDIDO',
-                    confirmButtonColor: '#059669',
-                }).then(() => {
-                    window.location.reload();
-                });
-                
-            } else {
-                // Todos fallaron - no imprimir nada
-                console.log('❌ Todos los pagos fallaron - sin impresión');
-                
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error en los pagos',
-                    text: 'No se pudo procesar ningún pago. No se imprimió ningún ticket.',
-                    confirmButtonText: 'ENTENDIDO',
-                    confirmButtonColor: '#dc2626',
-                });
-            }
-
-        } catch (error) {
-            console.error('❌ Error en proceso de pago múltiple:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error inesperado',
-                text: 'Hubo un problema técnico. Inténtelo nuevamente.',
-                confirmButtonText: 'ENTENDIDO',
-                confirmButtonColor: '#dc2626',
-            });
-        }
+    return {
+        cliente: clienteNombre,
+        nis: nis,
+        factura: 'PAGO MÚLTIPLE',
+        fecha: ahora.toLocaleDateString('es-AR'),
+        importe: totalImporte.toString(),
+        vencimiento: `${selectedItems.length} vencimientos`,
+        metodoPago: metodoPago.toUpperCase(),
+        transaccion: transactionId,
+        detalleFacturas: detalleFacturas,
+        resumenTipos: resumenTipos,
+        cantidadFacturas: Object.keys(facturaGroups).length,
+        cantidadVencimientos: selectedItems.length,
+        fechaPago: ahora.toLocaleString('es-AR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        }),
+        // Para compatibilidad con el servidor existente
+        nombreCliente: clienteNombre
     };
+}
 
-    return { handlePagoMultiple };
-};
+/**
+ * Envía el ticket al servidor local de impresión TAS
+ */
+export async function enviarTicketAServidorLocal(datosTicket) {
+    try {
+        console.log('🖨️ Enviando ticket múltiple al servidor local...', datosTicket);
 
-// ==============================
-// 🎯 EXTENSIÓN PARA BROWSERPRINT SERVICE
-// ==============================
+        const response = await fetch('http://localhost:9100/imprimir', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(datosTicket),
+            timeout: 10000 // 10 segundos timeout
+        });
 
-// Agregar esta función al browserPrintService existente SIN TOCAR NADA MÁS:
-export const extenderBrowserPrintService = () => {
-    
-    // Interceptar solo si es ticket múltiple
-    const originalPrepararDatos = window.prepararDatosTicketOriginal || prepararDatosTicket;
-    
-    window.prepararDatosTicketMultipleExtension = (datosTicket) => {
-        if (datosTicket.isMultiple) {
-            // Generar contenido especial para múltiples
-            const contenidoEspecial = generarContenidoTicketMultiple(datosTicket);
-            
-            if (contenidoEspecial) {
-                // Modificar solo el template, mantener toda la infraestructura VPN
-                return {
-                    ...datosTicket,
-                    templateCustom: contenidoEspecial
-                };
-            }
+        if (!response.ok) {
+            throw new Error(`Error del servidor: ${response.status} - ${response.statusText}`);
         }
+
+        const result = await response.json();
+        console.log('✅ Respuesta del servidor de impresión:', result);
         
-        // Si no es múltiple, usar función original
-        return originalPrepararDatos ? originalPrepararDatos(datosTicket) : datosTicket;
-    };
-};
-
-// ==============================
-// 🔧 MODIFICACIÓN MÍNIMA BROWSERPRINT
-// ==============================
-
-// Solo agregar estas líneas al browserPrintService.js existente:
-/*
-// Al final del archivo browserPrintService.js, agregar:
-
-// 🆕 EXTENSIÓN PARA TICKETS MÚLTIPLES - NO AFECTA FUNCIONAMIENTO ACTUAL
-export const procesarTicketConExtension = async (datosTicket) => {
-    // Si tiene template custom (múltiple), usar ese
-    if (datosTicket.templateCustom) {
-        console.log('🎫 Procesando ticket múltiple con template especial');
-        
-        // Usar la infraestructura existente pero con template custom
-        const datosModificados = {
-            ...datosTicket,
-            // Mantener toda la lógica VPN existente
-            contenidoPersonalizado: datosTicket.templateCustom
+        return {
+            success: true,
+            message: result.mensaje || 'Ticket enviado correctamente',
+            facturaProcessed: result.factura
         };
         
-        return await imprimirTicketDesdeNavegador(datosModificados);
+    } catch (error) {
+        console.error('❌ Error al comunicarse con servidor local:', error);
+        throw new Error(`Error de impresión: ${error.message}`);
     }
-    
-    // Si no, usar la función original sin cambios
-    return await imprimirTicketDesdeNavegador(datosTicket);
-};
-*/
-
-// ==============================
-// 🎯 INTEGRACIÓN EN TASFacturasGrid - SOLO 3 LÍNEAS
-// ==============================
-
-// En el TASFacturasGrid.jsx existente, solo agregar:
-/*
-// Importar al inicio:
-import { integrarPagoMultipleEnGrid, imprimirTicketMultiple } from '../services/multiplePaymentPrintService';
-
-// En la función handlePagar del TAS (después de procesar múltiples pagos exitosos):
-if (exitosos.length > 1) {
-    await imprimirTicketMultiple(exitosos, nis, cliente);
 }
-*/
 
-export default {
-    isMultiplePayment,
-    prepararDatosTicketMultiple,
-    imprimirTicketMultiple,
-    generarContenidoTicketMultiple,
-    integrarPagoMultipleEnGrid,
-    extenderBrowserPrintService
-};
+/**
+ * Genera un ticket de respaldo usando window.print() si el servidor falla
+ */
+export async function generarTicketRespaldo(datosTicket) {
+    try {
+        console.log('🖨️ Generando ticket de respaldo con window.print()...');
+
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Comprobante Pago Múltiple</title>
+                <style>
+                    @page {
+                        size: 80mm auto;
+                        margin: 0;
+                    }
+                    
+                    @media print {
+                        body {
+                            width: 80mm;
+                            font-family: 'Courier New', monospace;
+                            font-size: 11px;
+                            line-height: 1.3;
+                            margin: 0;
+                            padding: 3mm;
+                        }
+                        
+                        .header {
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 14px;
+                            margin-bottom: 3mm;
+                            border-bottom: 2px solid #000;
+                            padding-bottom: 2mm;
+                        }
+                        
+                        .separator {
+                            border-top: 1px dashed #000;
+                            margin: 2mm 0;
+                        }
+                        
+                        .section-title {
+                            font-weight: bold;
+                            text-decoration: underline;
+                            margin-top: 2mm;
+                        }
+                        
+                        .total-amount {
+                            text-align: center;
+                            font-size: 16px;
+                            font-weight: bold;
+                            margin: 3mm 0;
+                            border: 2px solid #000;
+                            padding: 2mm;
+                        }
+                        
+                        .footer {
+                            text-align: center;
+                            margin-top: 4mm;
+                            font-size: 10px;
+                        }
+                        
+                        .detail-section {
+                            background-color: #f9f9f9;
+                            padding: 2mm;
+                            margin: 2mm 0;
+                            border: 1px solid #ccc;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    COOPERATIVA POPULAR<br>
+                    COMPROBANTE PAGO MÚLTIPLE
+                </div>
+                
+                <div class="section-title">CLIENTE:</div>
+                ${datosTicket.cliente}<br>
+                NIS: ${datosTicket.nis}
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">RESUMEN DEL PAGO:</div>
+                <div class="detail-section">
+                    Cantidad de facturas: ${datosTicket.cantidadFacturas}<br>
+                    Cantidad de vencimientos: ${datosTicket.cantidadVencimientos}<br><br>
+                    ${datosTicket.resumenTipos}
+                </div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">DETALLE POR FACTURA:</div>
+                <div class="detail-section">
+                    <pre style="font-size: 9px; margin: 0; white-space: pre-wrap;">${datosTicket.detalleFacturas}</pre>
+                </div>
+                
+                <div class="separator"></div>
+                
+                <div class="section-title">INFORMACIÓN DEL PAGO:</div>
+                Método: ${datosTicket.metodoPago}<br>
+                Fecha: ${datosTicket.fechaPago}<br>
+                ID Transacción: ${datosTicket.transaccion}
+                
+                <div class="separator"></div>
+                
+                <div class="total-amount">
+                    TOTAL PAGADO<br>
+                    ${parseFloat(datosTicket.importe).toLocaleString()}
+                </div>
+                
+                <div class="separator"></div>
+                
+                <div class="footer">
+                    ✅ PAGO MÚLTIPLE PROCESADO EXITOSAMENTE<br>
+                    Gracias por su pago<br><br>
+                    ${new Date().toLocaleString()}<br><br>
+                    Ticket válido como comprobante de pago<br>
+                    No válido como factura fiscal
+                </div>
+            </body>
+            </html>
+        `;
+
+        // Abrir ventana de impresión
+        const printWindow = window.open('', '_blank', 'width=400,height=700');
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+
+        // Esperar a que cargue y luego imprimir
+        return new Promise((resolve, reject) => {
+            printWindow.onload = () => {
+                setTimeout(() => {
+                    printWindow.print();
+                    setTimeout(() => {
+                        printWindow.close();
+                        resolve(true);
+                    }, 1000);
+                }, 500);
+            };
+
+            printWindow.onerror = () => {
+                reject(new Error('Error abriendo ventana de impresión'));
+            };
+        });
+        
+    } catch (error) {
+        console.error('❌ Error en impresión de respaldo:', error);
+        throw error;
+    }
+}
+
+/**
+ * Función principal para imprimir ticket de pago múltiple
+ */
+export async function imprimirTicketPagoMultiple(selectedItems, nis, clienteNombre, metodoPago, transactionId) {
+    try {
+        console.log('🖨️ Iniciando impresión de ticket múltiple...');
+        console.log('📋 Items seleccionados:', selectedItems);
+
+        // Preparar datos del ticket
+        const datosTicket = prepararDatosTicketMultiple(
+            selectedItems, 
+            nis, 
+            clienteNombre, 
+            metodoPago, 
+            transactionId
+        );
+
+        console.log('📄 Datos del ticket preparados:', datosTicket);
+
+        // Mostrar loading discreto
+        Swal.fire({
+            title: '🖨️ Generando comprobante...',
+            text: 'Preparando ticket de pago múltiple',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            timer: 2000,
+            didOpen: () => {
+                Swal.showLoading();
+            },
+        });
+
+        let impresionExitosa = false;
+        let metodoUsado = '';
+
+        // Método 1: Servidor local TAS (preferido)
+        if (await isLocalPrintServerAvailable()) {
+            try {
+                await enviarTicketAServidorLocal(datosTicket);
+                impresionExitosa = true;
+                metodoUsado = 'Servidor TAS local';
+                console.log('✅ Impresión exitosa con servidor local');
+            } catch (error) {
+                console.error('❌ Error con servidor local:', error.message);
+            }
+        }
+
+        // Método 2: window.print() como respaldo
+        if (!impresionExitosa) {
+            try {
+                await generarTicketRespaldo(datosTicket);
+                impresionExitosa = true;
+                metodoUsado = 'Impresión de respaldo';
+                console.log('✅ Impresión exitosa con método de respaldo');
+            } catch (error) {
+                console.error('❌ Error con método de respaldo:', error.message);
+            }
+        }
+
+        // Cerrar loading y mostrar resultado
+        Swal.close();
+
+        if (impresionExitosa) {
+            // Success toast - no bloquear flujo
+            return {
+                success: true,
+                message: `Comprobante enviado (${metodoUsado})`,
+                totalAmount: parseFloat(datosTicket.importe),
+                itemCount: selectedItems.length
+            };
+        } else {
+            throw new Error('No se pudo imprimir con ningún método disponible');
+        }
+
+    } catch (error) {
+        console.error('❌ Error en impresión múltiple:', error);
+        
+        // Error toast - no bloquear flujo principal
+        Swal.fire({
+            icon: 'warning',
+            title: 'Error de impresión',
+            html: `
+                <p>No se pudo imprimir automáticamente.</p>
+                <p><strong>El pago múltiple fue exitoso.</strong></p>
+                <br>
+                <p><small>El comprobante puede consultarse en su cuenta online.</small></p>
+            `,
+            timer: 4000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+
+        return {
+            success: false,
+            error: error.message,
+            paymentProcessed: true // El pago sí se procesó, solo falló la impresión
+        };
+    }
+}
+
+/**
+ * Función para testing manual de impresión múltiple
+ */
+export async function testImpresionMultiple(customItems = null) {
+    const itemsTest = customItems || [
+        {
+            id: '1184691-1',
+            nis: '7000001',
+            factura: '1184691',
+            vencimiento: '12/03/2025',
+            amount: 82750,
+            tipo: '1° Vencimiento',
+            descripcion: 'Factura 1184691 - 1° Vencimiento'
+        },
+        {
+            id: '1184691-2',
+            nis: '7000001',
+            factura: '1184691',
+            vencimiento: '26/03/2025',
+            amount: 82750,
+            tipo: '2° Vencimiento',
+            descripcion: 'Factura 1184691 - 2° Vencimiento'
+        },
+        {
+            id: '1184692-1',
+            nis: '7000001',
+            factura: '1184692',
+            vencimiento: '15/04/2025',
+            amount: 95000,
+            tipo: '1° Vencimiento',
+            descripcion: 'Factura 1184692 - 1° Vencimiento'
+        }
+    ];
+
+    console.log('🧪 Test de impresión múltiple iniciado...');
+
+    try {
+        const result = await imprimirTicketPagoMultiple(
+            itemsTest,
+            '7000001',
+            'ABALLAY ANTONIO',
+            'MODO',
+            'TEST_MULTIPLE_' + Date.now()
+        );
+
+        console.log('✅ Test completado:', result);
+        return result;
+    } catch (error) {
+        console.error('❌ Test falló:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Función para verificar configuración de impresión
+ */
+export async function verificarConfiguracionImpresion() {
+    console.log('🔍 Verificando configuración de impresión...');
+    
+    const config = {
+        servidorLocal: false,
+        windowPrint: typeof window !== 'undefined' && 'print' in window,
+        timestamp: new Date().toISOString()
+    };
+
+    // Verificar servidor local
+    try {
+        config.servidorLocal = await isLocalPrintServerAvailable();
+        if (config.servidorLocal) {
+            console.log('✅ Servidor local TAS disponible en puerto 9100');
+        } else {
+            console.log('⚠️ Servidor local TAS no disponible');
+        }
+    } catch (error) {
+        console.log('❌ Error verificando servidor local:', error.message);
+        config.servidorLocal = false;
+    }
+
+    console.log('📋 Configuración de impresión:', config);
+    return config;
+}
+
+/**
+ * Función para mostrar preview del ticket múltiple (para testing/debug)
+ */
+export function mostrarPreviewTicketMultiple(selectedItems, nis, clienteNombre, metodoPago) {
+    const datosTicket = prepararDatosTicketMultiple(
+        selectedItems, 
+        nis, 
+        clienteNombre, 
+        metodoPago, 
+        'PREVIEW_' + Date.now()
+    );
+
+    const preview = `
+========================================
+       COOPERATIVA POPULAR
+     COMPROBANTE PAGO MÚLTIPLE
+========================================
+
+CLIENTE: ${datosTicket.cliente}
+NIS: ${datosTicket.nis}
+
+----------------------------------------
+RESUMEN DEL PAGO:
+Cantidad de facturas: ${datosTicket.cantidadFacturas}
+Cantidad de vencimientos: ${datosTicket.cantidadVencimientos}
+
+${datosTicket.resumenTipos}
+----------------------------------------
+
+DETALLE POR FACTURA:
+${datosTicket.detalleFacturas}
+
+----------------------------------------
+INFORMACIÓN DEL PAGO:
+Método: ${datosTicket.metodoPago}
+Fecha: ${datosTicket.fechaPago}
+ID Transacción: ${datosTicket.transaccion}
+----------------------------------------
+
+         TOTAL PAGADO
+        ${parseFloat(datosTicket.importe).toLocaleString()}
+
+========================================
+✅ PAGO MÚLTIPLE PROCESADO EXITOSAMENTE
+       Gracias por su pago
+
+     ${new Date().toLocaleString()}
+
+  Ticket válido como comprobante de pago
+     No válido como factura fiscal
+========================================
+    `;
+
+    console.log('📄 Preview del ticket múltiple:');
+    console.log(preview);
+    
+    return {
+        preview,
+        datosTicket
+    };
+}
+
+// Hacer funciones disponibles globalmente para testing en consola
+if (typeof window !== 'undefined') {
+    window.testImpresionMultiple = testImpresionMultiple;
+    window.verificarConfiguracionImpresion = verificarConfiguracionImpresion;
+    window.mostrarPreviewTicketMultiple = mostrarPreviewTicketMultiple;
+    
+    console.log('🧪 Funciones de testing múltiple disponibles:');
+    console.log('- testImpresionMultiple(): Test completo de impresión');
+    console.log('- verificarConfiguracionImpresion(): Verificar setup');
+    console.log('- mostrarPreviewTicketMultiple(items, nis, cliente, metodo): Ver preview');
+}
