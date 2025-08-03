@@ -1,10 +1,9 @@
-// TASFacturasGrid.jsx - Diseño Profesional para Pagos Múltiples
-import { useState, useCallback, useMemo, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import { processPayment } from '../services/paymentService';
-import { imprimirTicketMultiple } from '../services/multiplePaymentPrintService';
+import { downloadFactura, isVencido } from '../services/facturaService';
 
-// ✅ FUNCIÓN PARA CALCULAR IMPORTES (copiada exacta del MultiplePaymentSelector)
+
+// Función para calcular los importes correctos según la lógica original
 function calcularImportesFactura(factura) {
     const estado = factura.ESTADO;
     const cta1Imp = parseFloat(factura.CTA1_IMP || 0);
@@ -18,13 +17,15 @@ function calcularImportesFactura(factura) {
     let estadoPago2 = 'PENDIENTE';
 
     if (estado === 'IMPAGA') {
+        // Ambos vencimientos pendientes
         importe1Mostrar = cta1Imp;
         importe2Mostrar = cta2Imp;
         habilitarPago1 = true;
-        habilitarPago2 = false;
+        habilitarPago2 = cta2Imp > 0; // Solo si hay segundo vencimiento
         estadoPago1 = 'PENDIENTE';
         estadoPago2 = cta2Imp > 0 ? 'PENDIENTE' : 'NO_DISPONIBLE';
     } else if (estado === 'PARCIAL') {
+        // Primer vencimiento pagado, solo segundo pendiente
         importe1Mostrar = cta1Imp;
         importe2Mostrar = cta2Imp;
         habilitarPago1 = false;
@@ -32,6 +33,7 @@ function calcularImportesFactura(factura) {
         estadoPago1 = 'PAGADO';
         estadoPago2 = 'PENDIENTE';
     } else if (estado === 'PAGADA') {
+        // Ambos pagados (no debería aparecer en la lista)
         importe1Mostrar = cta1Imp;
         importe2Mostrar = cta2Imp;
         habilitarPago1 = false;
@@ -51,493 +53,350 @@ function calcularImportesFactura(factura) {
     };
 }
 
-// ✅ COMPONENTE INDIVIDUAL DE VENCIMIENTO SELECCIONABLE
-function VencimientoSeleccionable({ 
-    vencimiento, 
-    isSelected, 
-    onToggle, 
-    isDisabled = false 
-}) {
-    const handleClick = () => {
-        if (!isDisabled) {
-            onToggle(vencimiento);
-        }
-    };
+// Componente individual de card con lógica corregida
+function FacturaCard({ factura, nis, onPagar, onDescargar }) {
+    const saldo = parseFloat(factura.SALDO || 0);
+    const calculado = calcularImportesFactura(factura);
 
     return (
-        <button
-            onClick={handleClick}
-            disabled={isDisabled}
-            className={`w-full p-6 rounded-2xl border-4 transition-all duration-300 text-left active:scale-95 ${
-                isDisabled
-                    ? 'bg-gray-300 border-gray-400 opacity-60 cursor-not-allowed'
-                    : isSelected
-                        ? 'bg-yellow-500 border-yellow-300 text-black shadow-2xl scale-105'
-                        : 'bg-green-700 border-green-500 hover:bg-green-600 cursor-pointer text-white'
-            }`}
-            style={{ 
-                minHeight: '120px',
-                touchAction: 'manipulation' // Optimización para touch
-            }}
-        >
-            <div className="flex justify-between items-center h-full">
-                {/* Información del vencimiento */}
-                <div className="flex-1">
-                    <div className={`text-2xl font-black mb-2 ${
-                        isDisabled 
-                            ? 'text-gray-600' 
-                            : isSelected 
-                                ? 'text-black' 
-                                : 'text-white'
-                    }`}>
-                        FACTURA {vencimiento.nroFactura}
-                    </div>
-                    <div className={`text-xl font-bold mb-1 ${
-                        isDisabled 
-                            ? 'text-gray-500' 
-                            : isSelected 
-                                ? 'text-black' 
-                                : 'text-green-100'
-                    }`}>
-                        {vencimiento.tipo}
-                    </div>
-                    <div className={`text-lg ${
-                        isDisabled 
-                            ? 'text-gray-500' 
-                            : isSelected 
-                                ? 'text-black' 
-                                : 'text-green-200'
-                    }`}>
-                        Vence: {vencimiento.fecha}
-                    </div>
+        <div className='bg-red-900/40 border border-red-500 p-3 rounded-lg flex flex-col justify-between min-h-[140px] hover:bg-red-900/50 transition-all'>
+            <div className='flex justify-between items-start mb-2'>
+                <div>
+                    <p className='text-red-200 text-xs uppercase'>FACTURA</p>
+                    <p className='text-white font-mono text-sm font-bold'>
+                        N° {factura.NROFACT}
+                    </p>
                 </div>
-
-                {/* Precio y estado */}
-                <div className="text-right">
-                    <div className={`text-3xl font-black mb-2 ${
-                        isDisabled 
-                            ? 'text-gray-600' 
-                            : isSelected 
-                                ? 'text-black' 
-                                : 'text-white'
-                    }`}>
-                        ${vencimiento.importe.toLocaleString('es-AR')}
-                    </div>
-                    <div className={`text-lg font-bold ${
-                        isDisabled 
-                            ? 'text-gray-500' 
-                            : isSelected 
-                                ? 'text-black' 
-                                : 'text-green-200'
-                    }`}>
-                        {isDisabled 
-                            ? (vencimiento.estadoPago === 'PAGADO' ? '✅ PAGADO' : '🚫 NO DISPONIBLE')
-                            : isSelected 
-                                ? '☑️ SELECCIONADO' 
-                                : '👆 TOCAR PARA SELECCIONAR'
-                        }
-                    </div>
+                <div className='text-right'>
+                    <p className='text-red-200 text-xs uppercase'>SALDO</p>
+                    <p className='text-white text-sm font-bold'>
+                        ${saldo.toLocaleString()}
+                    </p>
                 </div>
             </div>
-        </button>
-    );
-}
-
-// ✅ BOTÓN TOTALIZADOR FLOTANTE
-function TotalizadorFlotante({ selectedVencimientos, onPagar, isProcessing }) {
-    if (selectedVencimientos.length === 0) return null;
-
-    const total = selectedVencimientos.reduce((sum, v) => sum + parseFloat(v.amount), 0);
-
-    return (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-11/12 max-w-md">
-            <div className="bg-green-600 border-4 border-green-300 rounded-2xl p-6 shadow-2xl">
-                <div className="text-center text-white mb-4">
-                    <div className="text-xl font-bold mb-2">
-                        {selectedVencimientos.length} VENCIMIENTOS SELECCIONADOS
-                    </div>
-                    <div className="text-4xl font-black">
-                        TOTAL: ${total.toLocaleString('es-AR')}
+            {/* Vencimientos con estados correctos */}
+            <div className='flex-1 mb-3'>
+                {/* Primer vencimiento */}
+                <div
+                    className={`p-2 rounded mb-1 ${
+                        calculado.estadoPago1 === 'PAGADO'
+                            ? 'bg-blue-900/30 border border-blue-500'
+                            : 'bg-green-900/30'
+                    }`}
+                >
+                    <div className='flex justify-between items-center'>
+                        <span
+                            className={`text-xs ${
+                                calculado.estadoPago1 === 'PAGADO'
+                                    ? 'text-blue-200'
+                                    : 'text-green-200'
+                            }`}
+                        >
+                            1° {factura.CTA1_VTO}
+                        </span>
+                        <div className='flex items-center gap-1'>
+                            <span
+                                className={`font-bold text-xs ${
+                                    calculado.estadoPago1 === 'PAGADO'
+                                        ? 'text-blue-100'
+                                        : 'text-green-100'
+                                }`}
+                            >
+                                ${calculado.importe1.toLocaleString()}
+                            </span>
+                            {calculado.estadoPago1 === 'PAGADO' && (
+                                <span className='text-blue-200 text-[10px]'>
+                                    ✅
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <button
-                    onClick={onPagar}
-                    disabled={isProcessing}
-                    className={`w-full py-6 px-8 rounded-2xl text-3xl font-black text-white border-4 transition-all duration-300 ${
-                        isProcessing
-                            ? 'bg-gray-600 border-gray-400 cursor-not-allowed opacity-50'
-                            : 'bg-yellow-600 border-yellow-300 hover:bg-yellow-500 active:scale-95 shadow-lg hover:shadow-xl'
-                    }`}
-                    style={{ 
-                        minHeight: '80px',
-                        touchAction: 'manipulation'
-                    }}
-                >
-                    {isProcessing ? (
-                        <div className="flex items-center justify-center gap-4">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-white"></div>
-                            PROCESANDO...
+
+                {/* Segundo vencimiento (si existe) */}
+                {calculado.tieneSegundoVencimiento && (
+                    <div
+                        className={`p-2 rounded ${
+                            calculado.estadoPago2 === 'PAGADO'
+                                ? 'bg-blue-900/30 border border-blue-500'
+                                : 'bg-orange-900/30'
+                        }`}
+                    >
+                        <div className='flex justify-between items-center'>
+                            <span
+                                className={`text-xs ${
+                                    calculado.estadoPago2 === 'PAGADO'
+                                        ? 'text-blue-200'
+                                        : 'text-orange-200'
+                                }`}
+                            >
+                                2° {factura.CTA2_VTO}
+                            </span>
+                            <div className='flex items-center gap-1'>
+                                <span
+                                    className={`font-bold text-xs ${
+                                        calculado.estadoPago2 === 'PAGADO'
+                                            ? 'text-blue-100'
+                                            : 'text-orange-100'
+                                    }`}
+                                >
+                                    ${calculado.importe2.toLocaleString()}
+                                </span>
+                                {calculado.estadoPago2 === 'PAGADO' && (
+                                    <span className='text-blue-200 text-[10px]'>
+                                        ✅
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                    ) : (
-                        '💳 PAGAR SELECCIONADOS'
-                    )}
+                    </div>
+                )}
+            </div>
+            {/* Botones */}
+            <div className='grid grid-cols-2 gap-2'>
+                <button
+                    onClick={() => onPagar(factura)}
+                    disabled={
+                        !calculado.habilitarPago1 && !calculado.habilitarPago2
+                    }
+                    className={`px-2 py-2 rounded text-white text-xs font-bold transition-all hover:scale-105 flex items-center justify-center ${
+                        calculado.habilitarPago1 || calculado.habilitarPago2
+                            ? 'bg-green-600 hover:bg-green-500 cursor-pointer'
+                            : 'bg-gray-600 cursor-not-allowed opacity-50'
+                    }`}
+                >
+                    💳 PAGAR
+                </button>
+                <button
+                    onClick={() => onDescargar(factura)}
+                    className='bg-blue-600 hover:bg-blue-500 px-2 py-2 rounded text-white text-xs font-bold transition-all hover:scale-105 flex items-center justify-center'
+                >
+                    📄 IMPRIMIR
                 </button>
             </div>
         </div>
     );
 }
 
-// ✅ COMPONENTE PRINCIPAL
+// Modal de selección de vencimiento con lógica corregida
+function PaymentModal({ factura, nis }) {
+    const calculado = calcularImportesFactura(factura);
+
+    const modalHTML = `
+        <div style="text-align: center; font-family: Arial, sans-serif; padding: 10px;">
+            <div style="background: linear-gradient(135deg, #059669, #047857); color: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 6px 20px rgba(5, 150, 105, 0.3);">
+                <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold;">FACTURA N° ${factura.NROFACT}</h2>
+                <p style="margin: 0; font-size: 14px; opacity: 0.9;">Seleccione el vencimiento a pagar</p>
+            </div>
+        </div>
+    `;
+
+    let footerButtons = '';
+
+    // Primer vencimiento (solo si está habilitado)
+    if (calculado.habilitarPago1) {
+        footerButtons += `
+            <div style="margin-bottom: 10px;">
+                <div style="background: #f3f4f6; padding: 10px; border-radius: 8px; margin-bottom: 6px;">
+                    <h3 style="margin: 0 0 4px 0; color: #374151; font-size: 12px; font-weight: bold;">1° VENCIMIENTO</h3>
+                    <p style="margin: 2px 0; color: #6b7280; font-size: 11px;">Fecha: ${
+                        factura.CTA1_VTO
+                    }</p>
+                    <p style="margin: 2px 0; color: #059669; font-size: 16px; font-weight: bold;">$${calculado.importe1.toLocaleString()}</p>
+                </div>
+                <button id="btn-pagar-venc1" data-factura="${
+                    factura.NROFACT
+                }" data-vencimiento="1" data-fecha="${
+            factura.CTA1_VTO
+        }" data-importe="${calculado.importe1}" style="
+                    background: linear-gradient(135deg, #16a34a, #15803d);
+                    color: white;
+                    border: none;
+                    padding: 10px 25px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4);
+                    transition: all 0.3s;
+                    width: 100%;
+                    margin-bottom: 6px;
+                ">
+                    💳 PAGAR 1° VENCIMIENTO
+                </button>
+            </div>
+        `;
+    }
+
+    // Segundo vencimiento (solo si está habilitado)
+    if (calculado.habilitarPago2 && calculado.tieneSegundoVencimiento) {
+        footerButtons += `
+            <div style="margin-bottom: 10px;">
+                <div style="background: #fef3c7; padding: 10px; border-radius: 8px; margin-bottom: 6px;">
+                    <h3 style="margin: 0 0 4px 0; color: #92400e; font-size: 12px; font-weight: bold;">2° VENCIMIENTO</h3>
+                    <p style="margin: 2px 0; color: #b45309; font-size: 11px;">Fecha: ${
+                        factura.CTA2_VTO
+                    }</p>
+                    <p style="margin: 2px 0; color: #d97706; font-size: 16px; font-weight: bold;">$${calculado.importe2.toLocaleString()}</p>
+                </div>
+                <button id="btn-pagar-venc2" data-factura="${
+                    factura.NROFACT
+                }" data-vencimiento="2" data-fecha="${
+            factura.CTA2_VTO
+        }" data-importe="${calculado.importe2}" style="
+                    background: linear-gradient(135deg, #d97706, #b45309);
+                    color: white;
+                    border: none;
+                    padding: 10px 25px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    box-shadow: 0 4px 15px rgba(217, 119, 6, 0.4);
+                    transition: all 0.3s;
+                    width: 100%;
+                ">
+                    💳 PAGAR 2° VENCIMIENTO
+                </button>
+            </div>
+        `;
+    }
+
+    // Si no hay vencimientos habilitados, mostrar mensaje
+    if (!calculado.habilitarPago1 && !calculado.habilitarPago2) {
+        footerButtons = `
+            <div style="text-align: center; padding: 20px;">
+                <p style="color: #059669; font-size: 16px; font-weight: bold;">✅ Factura completamente pagada</p>
+            </div>
+        `;
+    }
+
+    return Swal.fire({
+        html: modalHTML,
+        showCancelButton: false,
+        showConfirmButton: false,
+        showDenyButton: false,
+        width: 450,
+        padding: '20px',
+        background: '#f9fafb',
+        backdrop: 'rgba(0,0,0,0.85)',
+        allowOutsideClick: true,
+        allowEscapeKey: true,
+        showCloseButton: true,
+        footer: `<div style="text-align: center;">${footerButtons}</div>`,
+        didOpen: () => {
+            // Event listeners para ambos vencimientos
+            const btnVenc1 = document.getElementById('btn-pagar-venc1');
+            const btnVenc2 = document.getElementById('btn-pagar-venc2');
+
+            if (btnVenc1) {
+                btnVenc1.addEventListener('click', (e) => {
+                    const button = e.target;
+                    const paymentData = {
+                        factura: button.dataset.factura,
+                        vencimiento: button.dataset.vencimiento,
+                        fecha: button.dataset.fecha,
+                        importe: button.dataset.importe,
+                    };
+                    Swal.close();
+                    processPayment(paymentData, nis);
+                });
+
+                // Efectos hover
+                btnVenc1.addEventListener('mouseenter', () => {
+                    btnVenc1.style.transform = 'scale(1.02)';
+                    btnVenc1.style.boxShadow =
+                        '0 6px 20px rgba(22, 163, 74, 0.6)';
+                });
+                btnVenc1.addEventListener('mouseleave', () => {
+                    btnVenc1.style.transform = 'scale(1)';
+                    btnVenc1.style.boxShadow =
+                        '0 4px 15px rgba(22, 163, 74, 0.4)';
+                });
+            }
+
+            if (btnVenc2) {
+                btnVenc2.addEventListener('click', (e) => {
+                    const button = e.target;
+                    const paymentData = {
+                        factura: button.dataset.factura,
+                        vencimiento: button.dataset.vencimiento,
+                        fecha: button.dataset.fecha,
+                        importe: button.dataset.importe,
+                    };
+                    Swal.close();
+                    processPayment(paymentData, nis);
+                });
+
+                // Efectos hover
+                btnVenc2.addEventListener('mouseenter', () => {
+                    btnVenc2.style.transform = 'scale(1.02)';
+                    btnVenc2.style.boxShadow =
+                        '0 6px 20px rgba(217, 119, 6, 0.6)';
+                });
+                btnVenc2.addEventListener('mouseleave', () => {
+                    btnVenc2.style.transform = 'scale(1)';
+                    btnVenc2.style.boxShadow =
+                        '0 4px 15px rgba(217, 119, 6, 0.4)';
+                });
+            }
+        },
+    });
+}
+
+// Componente principal
 export default function TASFacturasGrid({ facturasImpagas, nis }) {
-    const [selectedVencimientos, setSelectedVencimientos] = useState([]);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [hasShownOrderWarning, setHasShownOrderWarning] = useState(false);
-
-    // ✅ GENERAR VENCIMIENTOS DISPONIBLES (lógica copiada exacta)
-    const vencimientosDisponibles = useMemo(() => {
-    const vencimientos = [];
-
-    try {
-        if (!facturasImpagas || !Array.isArray(facturasImpagas)) return vencimientos;
-
-        facturasImpagas.forEach(factura => {
-            if (!factura || typeof factura !== 'object') return;
-
-            const nroFactura = factura.NROFACT || factura.nrofact || factura.numero || 'SIN_NUMERO';
-            const estado = factura.ESTADO || factura.estado || factura.status || '';
-            const cta1Imp = parseFloat(factura.CTA1_IMP || factura.cta1_imp || factura.importe1 || 0);
-            const cta2Imp = parseFloat(factura.CTA2_IMP || factura.cta2_imp || factura.importe2 || 0);
-            const cta1Vto = factura.CTA1_VTO || factura.cta1_vto || factura.vencimiento1 || '';
-            const cta2Vto = factura.CTA2_VTO || factura.cta2_vto || factura.vencimiento2 || '';
-
-            const calculado = calcularImportesFactura(factura);
-
-            // Primer vencimiento
-            if (estado === 'IMPAGA' && cta1Imp > 0) {
-                vencimientos.push({
-                    id: `${nroFactura}-1`,
-                    nroFactura,
-                    tipo: '1° VENCIMIENTO',
-                    tipoCorto: '1°',
-                    fecha: cta1Vto,
-                    importe: cta1Imp,
-                    estado: estado,
-                    facturaCompleta: factura,
-                    priority: 1,
-                    estadoPago: calculado.estadoPago1,
-                    habilitado: calculado.habilitarPago1
-                });
-            }
-
-            // Segundo vencimiento
-            if ((estado === 'IMPAGA' || estado === 'PARCIAL') && cta2Imp > 0) {
-                vencimientos.push({
-                    id: `${nroFactura}-2`,
-                    nroFactura,
-                    tipo: '2° VENCIMIENTO',
-                    tipoCorto: '2°',
-                    fecha: cta2Vto,
-                    importe: cta2Imp,
-                    estado: estado,
-                    facturaCompleta: factura,
-                    priority: 2,
-                    estadoPago: calculado.estadoPago2,
-                    habilitado: calculado.habilitarPago2
-                });
-            }
-        });
-
-        return vencimientos.sort((a, b) => {
-            const fechaA = parsearFecha(a.fecha);
-            const fechaB = parsearFecha(b.fecha);
-            return fechaA - fechaB;
-        });
-
-    } catch (error) {
-        console.error('Error al calcular vencimientos disponibles:', error);
-        return vencimientos;
+    if (!facturasImpagas.length) {
+        return (
+            <div className='bg-green-800/30 p-4 rounded-xl text-center'>
+                <p className='text-lg text-green-200'>
+                    ✅ No tienes facturas pendientes
+                </p>
+            </div>
+        );
     }
-}, [facturasImpagas]);
 
+    const handlePagar = (factura) => {
+        PaymentModal({ factura, nis });
+    };
 
-    // ✅ FUNCIÓN PARA PARSEAR FECHAS
-    const parsearFecha = useCallback((fechaString) => {
-        if (!fechaString) return new Date();
-        const partes = fechaString.split('/');
-        if (partes.length !== 3) return new Date();
-        
-        return new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
-    }, []);
-
-    // ✅ VALIDACIÓN DE ORDEN DE PAGO (lógica copiada exacta)
-    const validatePaymentOrder = useCallback((selectedItems, todosVencimientos) => {
-        if (hasShownOrderWarning) {
-            return null;
+    const handleDescargar = async (factura) => {
+        try {
+            await downloadFactura(factura, nis);
+        } catch (error) {
+            console.error('Error al descargar factura:', error);
         }
-
-        const facturaGroups = {};
-        selectedItems.forEach(item => {
-            if (!facturaGroups[item.factura]) {
-                facturaGroups[item.factura] = [];
-            }
-            facturaGroups[item.factura].push(item);
-        });
-
-        const facturasSeleccionadas = Object.keys(facturaGroups);
-        
-        if (facturasSeleccionadas.length > 1) {
-            const facturasPorVencimiento = new Map();
-            
-            todosVencimientos.forEach(vencimiento => {
-                if (vencimiento.estado === 'IMPAGA' || vencimiento.estado === 'PARCIAL') {
-                    const fechaVencimiento = parsearFecha(vencimiento.fecha);
-                    
-                    if (!facturasPorVencimiento.has(vencimiento.nroFactura)) {
-                        facturasPorVencimiento.set(vencimiento.nroFactura, {
-                            numero: vencimiento.nroFactura,
-                            fechaMasAntigua: fechaVencimiento,
-                            fechaOriginal: vencimiento.fecha
-                        });
-                    } else {
-                        const facturaExistente = facturasPorVencimiento.get(vencimiento.nroFactura);
-                        if (fechaVencimiento < facturaExistente.fechaMasAntigua) {
-                            facturaExistente.fechaMasAntigua = fechaVencimiento;
-                            facturaExistente.fechaOriginal = vencimiento.fecha;
-                        }
-                    }
-                }
-            });
-            
-            const facturasOrdenadas = Array.from(facturasPorVencimiento.values())
-                .sort((a, b) => a.fechaMasAntigua - b.fechaMasAntigua);
-            
-            const facturasAnterioresPendientes = [];
-            let encontrePrimeraSeleccionada = false;
-            
-            for (const factura of facturasOrdenadas) {
-                if (facturasSeleccionadas.includes(factura.numero)) {
-                    encontrePrimeraSeleccionada = true;
-                } else if (!encontrePrimeraSeleccionada) {
-                    facturasAnterioresPendientes.push(factura.numero);
-                }
-            }
-            
-            const facturasIntermedias = [];
-            let primeraSeleccionadaIndex = -1;
-            let ultimaSeleccionadaIndex = -1;
-            
-            facturasOrdenadas.forEach((factura, index) => {
-                if (facturasSeleccionadas.includes(factura.numero)) {
-                    if (primeraSeleccionadaIndex === -1) primeraSeleccionadaIndex = index;
-                    ultimaSeleccionadaIndex = index;
-                }
-            });
-            
-            for (let i = primeraSeleccionadaIndex + 1; i < ultimaSeleccionadaIndex; i++) {
-                const factura = facturasOrdenadas[i];
-                if (!facturasSeleccionadas.includes(factura.numero)) {
-                    facturasIntermedias.push(factura.numero);
-                }
-            }
-            
-            if (facturasAnterioresPendientes.length > 0 || facturasIntermedias.length > 0) {
-                let facturasPendientes = [...facturasAnterioresPendientes, ...facturasIntermedias];
-                
-                let mensaje = `💡 <b>Recomendación de orden de pago:</b><br><br>`;
-                mensaje += `📅 <b>Facturas más antiguas pendientes:</b> ${facturasPendientes.join(', ')}<br><br>`;
-                mensaje += `Te recomendamos pagar en orden cronológico para mejor organización.<br><br>`;
-                mensaje += `¿Continuar con esta selección?`;
-                
-                return {
-                    type: 'warning',
-                    message: mensaje,
-                    facturasPendientes: facturasPendientes
-                };
-            }
-        }
-
-        return null;
-    }, [parsearFecha, hasShownOrderWarning]);
-
-    // ✅ MANEJAR SELECCIÓN DE VENCIMIENTO
-    const handleVencimientoToggle = useCallback(async (vencimiento) => {
-        const exists = selectedVencimientos.find(item => item.id === vencimiento.id);
-
-        if (exists) {
-            // Deseleccionar
-            const newSelectionAfterRemove = selectedVencimientos.filter(item => item.id !== vencimiento.id);
-            
-            // Validar que no se deseleccione 1er vencimiento si 2do está seleccionado
-            if (vencimiento.tipo === '1° VENCIMIENTO') {
-                const vencimientosDeEstaFactura = vencimientosDisponibles.filter(v => v.nroFactura === vencimiento.nroFactura);
-                const tieneDobleVencimiento = vencimientosDeEstaFactura.length === 2;
-                const estadoFactura = vencimientosDeEstaFactura[0]?.estado;
-                
-                if (estadoFactura === 'IMPAGA' && tieneDobleVencimiento) {
-                    const queda2doSeleccionado = newSelectionAfterRemove.some(item => 
-                        item.factura === vencimiento.nroFactura && item.tipo === '2° VENCIMIENTO'
-                    );
-                    
-                    if (queda2doSeleccionado) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'No puedes deseleccionar el 1° vencimiento',
-                            html: `<div style="font-size: 20px; padding: 20px;">Para la factura <b>${vencimiento.nroFactura}</b>:<br><br>Debes mantener el 1° vencimiento si tienes seleccionado el 2°.</div>`,
-                            confirmButtonText: 'ENTENDIDO',
-                            confirmButtonColor: '#dc2626',
-                            customClass: {
-                                popup: 'rounded-xl shadow-2xl',
-                                confirmButton: 'rounded-lg text-xl py-3 px-6'
-                            }
-                        });
-                        return;
-                    }
-                }
-            }
-            
-            setSelectedVencimientos(newSelectionAfterRemove);
-            return;
-        }
-
-        // Seleccionar - crear nuevo item
-        const newSelection = [...selectedVencimientos, {
-            id: vencimiento.id,
-            nis: nis,
-            factura: vencimiento.nroFactura,
-            vencimiento: vencimiento.fecha,
-            amount: vencimiento.importe,
-            tipo: vencimiento.tipo,
-            descripcion: `Factura ${vencimiento.nroFactura} - ${vencimiento.tipo}`
-        }];
-
-        // Validar orden de vencimiento dentro de la misma factura
-        if (vencimiento.tipo === '2° VENCIMIENTO') {
-            const vencimientosDeEstaFactura = vencimientosDisponibles.filter(v => v.nroFactura === vencimiento.nroFactura);
-            const tieneDobleVencimiento = vencimientosDeEstaFactura.length === 2;
-            const estadoFactura = vencimientosDeEstaFactura[0]?.estado;
-            
-            if (estadoFactura === 'IMPAGA' && tieneDobleVencimiento) {
-                const tiene1roSeleccionado = newSelection.some(item => 
-                    item.factura === vencimiento.nroFactura && item.tipo === '1° VENCIMIENTO'
-                );
-                
-                if (!tiene1roSeleccionado) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Orden de pago incorrecto',
-                        html: `<div style="font-size: 20px; padding: 20px;">Debes seleccionar primero el <b>1° vencimiento</b> de la factura <b>${vencimiento.nroFactura}</b>.</div>`,
-                        confirmButtonText: 'ENTENDIDO',
-                        confirmButtonColor: '#dc2626',
-                        customClass: {
-                            popup: 'rounded-xl shadow-2xl',
-                            confirmButton: 'rounded-lg text-xl py-3 px-6'
-                        }
-                    });
-                    return;
-                }
-            }
-        }
-
-        // Validar orden cronológico entre facturas
-        const validationResult = validatePaymentOrder(newSelection, vencimientosDisponibles);
-        
-        if (validationResult?.type === 'error') {
-            Swal.fire({
-                icon: 'error',
-                title: 'Orden de pago incorrecto',
-                html: `<div style="font-size: 18px; padding: 20px;">${validationResult.message}</div>`,
-                confirmButtonText: 'ENTENDIDO',
-                confirmButtonColor: '#dc2626',
-                customClass: {
-                    popup: 'rounded-xl shadow-2xl',
-                    confirmButton: 'rounded-lg text-xl py-3 px-6'
-                }
-            });
-        } else if (validationResult?.type === 'warning') {
-            const result = await Swal.fire({
-                icon: 'warning',
-                title: 'Orden de pago recomendado',
-                html: `<div style="font-size: 18px; padding: 20px;">${validationResult.message}</div>`,
-                showCancelButton: true,
-                confirmButtonText: 'CONTINUAR',
-                cancelButtonText: 'CANCELAR',
-                confirmButtonColor: '#059669',
-                cancelButtonColor: '#6b7280',
-                customClass: {
-                    popup: 'rounded-xl shadow-2xl',
-                    confirmButton: 'rounded-lg text-xl py-3 px-6',
-                    cancelButton: 'rounded-lg text-xl py-3 px-6'
-                }
-            });
-            
-            setHasShownOrderWarning(true);
-            
-            if (result.isConfirmed) {
-                setSelectedVencimientos(newSelection);
-            }
-        } else {
-            setSelectedVencimientos(newSelection);
-        }
-    }, [selectedVencimientos, nis, validatePaymentOrder, vencimientosDisponibles]);
-
-    // REEMPLAZAR TODA la función handlePagar con esto:
-const handlePagar = useCallback(async () => {
-    if (selectedVencimientos.length === 0) return;
-
-    // ✅ USAR LA LÓGICA QUE FUNCIONA
-    try {
-        setIsProcessing(true);
-        
-        // Importar la función que funciona
-        const { procesarPagoMultiple } = await import('../services/sharedMultiplePaymentService');
-        
-        // Llamar con los datos correctos
-        const resultado = await procesarPagoMultiple(selectedVencimientos, nis, process.env.NEXT_PUBLIC_API_URL);
-        
-        console.log('✅ Resultado:', resultado);
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('Error: ' + error.message);
-    } finally {
-        setIsProcessing(false);
-    }
-}, [selectedVencimientos, nis]);
+    };
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-4">
-            {/* Header informativo */}
-            <div className="mb-8 text-center">
-                <h1 className="text-4xl font-black text-gray-800 mb-4">
-                    SELECCIONAR VENCIMIENTOS A PAGAR
-                </h1>
-                <div className="text-2xl text-gray-600">
-                    NIS: <span className="font-bold text-gray-800">{nis}</span>
-                </div>
-                <div className="text-xl text-gray-500 mt-2">
-                    👆 Toque los vencimientos que desea pagar
+        <div className='bg-green-800/30 p-2 rounded-lg flex-1 overflow-hidden'>
+            // En cualquier componente
+            <button
+                onClick={() => {
+                    import('../services/browserPrintService').then((module) => {
+                        module.testImpresion();
+                    });
+                }}
+            >
+                🖨️ TEST IMPRESIÓN
+            </button>
+            <h3 className='text-base font-bold mb-2 text-lime-200 text-center'>
+                FACTURAS PENDIENTES ({facturasImpagas.length})
+            </h3>
+            {/* GRILLA CON MENOS COLUMNAS para cards más grandes */}
+            <div className='h-full overflow-y-auto'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 auto-rows-max'>
+                    {facturasImpagas.map((factura, index) => (
+                        <FacturaCard
+                            key={index}
+                            factura={factura}
+                            nis={nis}
+                            onPagar={handlePagar}
+                            onDescargar={handleDescargar}
+                        />
+                    ))}
                 </div>
             </div>
-
-            {/* Lista de vencimientos */}
-            <div className="space-y-4 mb-32">
-                {vencimientosDisponibles.map(vencimiento => (
-                    <VencimientoSeleccionable
-                        key={vencimiento.id}
-                        vencimiento={vencimiento}
-                        isSelected={selectedVencimientos.some(item => item.id === vencimiento.id)}
-                        onToggle={handleVencimientoToggle}
-                        isDisabled={!vencimiento.habilitado}
-                    />
-                ))}
-            </div>
-
-            {/* Totalizador flotante */}
-            <TotalizadorFlotante
-                selectedVencimientos={selectedVencimientos}
-                onPagar={handlePagar}
-                isProcessing={isProcessing}
-            />
         </div>
     );
 }
