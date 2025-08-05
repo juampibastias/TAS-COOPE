@@ -8,10 +8,13 @@ import TASFacturasGrid from '../components/TASFacturasGrid';
 
 // Componente de Header optimizado
 function Header({ onExit }) {
+    const logoPath = process.env.NODE_ENV === 'production' 
+    ? '/tas-coope/logo.png' 
+    : '/logo.png';
     return (
         <div className='bg-gradient-to-r from-green-800 to-lime-600 p-4 shadow-lg'>
             <div className='flex justify-between items-center'>
-                <img src='/LOGO.png' alt='Logo' className='h-12' />
+                <img src={logoPath} alt='Logo' className='h-12' />
                 <h1 className='text-xl font-bold text-center flex-1 mx-4'>
                     ESTADO DE CUENTA
                 </h1>
@@ -33,7 +36,7 @@ function Footer({ nis, pendientes }) {
             <div className='flex justify-between items-center max-w-4xl mx-auto'>
                 <span>🔒 Sesión segura</span>
                 <span>NIS: {nis}</span>
-                <span>Pendientes: {pendientes}</span>
+                <span>Facturas pendientes</span>
             </div>
         </div>
     );

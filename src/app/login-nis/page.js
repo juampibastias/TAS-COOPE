@@ -12,6 +12,10 @@ export default function LoginNISPage() {
     const [cargando, setCargando] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+    const logoPath = process.env.NODE_ENV === 'production' 
+    ? '/tas-coope/logo.png' 
+    : '/logo.png';
+
     const [modoSuspendido, setModoSuspendido] = useState(false); // Cambiado a false para mostrar directamente
     const [mostrarBienvenida, setMostrarBienvenida] = useState(false);
 
@@ -323,7 +327,7 @@ export default function LoginNISPage() {
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-4'>
                         <img
-                            src='/LOGO.png'
+                            src={logoPath} 
                             alt='Logo Cooperativa'
                             className='h-12 w-auto object-contain'
                         />

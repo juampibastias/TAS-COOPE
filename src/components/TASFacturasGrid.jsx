@@ -62,14 +62,14 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
         <div className='bg-red-900/40 border border-red-500 p-3 rounded-lg flex flex-col justify-between min-h-[140px] hover:bg-red-900/50 transition-all'>
             <div className='flex justify-between items-start mb-2'>
                 <div>
-                    <p className='text-red-200 text-xs uppercase'>FACTURA</p>
-                    <p className='text-white font-mono text-sm font-bold'>
+                    <p className='text-red-200 text-xl uppercase'>FACTURA</p>
+                    <p className='text-white font-mono text-xl font-bold'>
                         N° {factura.NROFACT}
                     </p>
                 </div>
                 <div className='text-right'>
-                    <p className='text-red-200 text-xs uppercase'>SALDO</p>
-                    <p className='text-white text-sm font-bold'>
+                    <p className='text-red-200 text-xl uppercase'>SALDO</p>
+                    <p className='text-white text-xl font-bold'>
                         ${saldo.toLocaleString()}
                     </p>
                 </div>
@@ -86,7 +86,7 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
                 >
                     <div className='flex justify-between items-center'>
                         <span
-                            className={`text-xs ${
+                            className={`text-xl ${
                                 calculado.estadoPago1 === 'PAGADO'
                                     ? 'text-blue-200'
                                     : 'text-green-200'
@@ -96,7 +96,7 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
                         </span>
                         <div className='flex items-center gap-1'>
                             <span
-                                className={`font-bold text-xs ${
+                                className={`font-bold text-xl ${
                                     calculado.estadoPago1 === 'PAGADO'
                                         ? 'text-blue-100'
                                         : 'text-green-100'
@@ -124,7 +124,7 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
                     >
                         <div className='flex justify-between items-center'>
                             <span
-                                className={`text-xs ${
+                                className={`text-xl ${
                                     calculado.estadoPago2 === 'PAGADO'
                                         ? 'text-blue-200'
                                         : 'text-orange-200'
@@ -134,7 +134,7 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
                             </span>
                             <div className='flex items-center gap-1'>
                                 <span
-                                    className={`font-bold text-xs ${
+                                    className={`font-bold text-xl ${
                                         calculado.estadoPago2 === 'PAGADO'
                                             ? 'text-blue-100'
                                             : 'text-orange-100'
@@ -153,13 +153,13 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
                 )}
             </div>
             {/* Botones */}
-            <div className='grid grid-cols-2 gap-2'>
+            <div className='grid grid-cols-1 gap-1'>
                 <button
                     onClick={() => onPagar(factura)}
                     disabled={
                         !calculado.habilitarPago1 && !calculado.habilitarPago2
                     }
-                    className={`px-2 py-2 rounded text-white text-xs font-bold transition-all hover:scale-105 flex items-center justify-center ${
+                    className={`px-2 py-2 rounded text-white text-xl font-bold transition-all hover:scale-105 flex items-center justify-center ${
                         calculado.habilitarPago1 || calculado.habilitarPago2
                             ? 'bg-green-600 hover:bg-green-500 cursor-pointer'
                             : 'bg-gray-600 cursor-not-allowed opacity-50'
@@ -167,12 +167,12 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
                 >
                     💳 PAGAR
                 </button>
-                <button
+                {/* <button
                     onClick={() => onDescargar(factura)}
-                    className='bg-blue-600 hover:bg-blue-500 px-2 py-2 rounded text-white text-xs font-bold transition-all hover:scale-105 flex items-center justify-center'
+                    className='bg-blue-600 hover:bg-blue-500 px-2 py-2 rounded text-white text-xl font-bold transition-all hover:scale-105 flex items-center justify-center'
                 >
                     📄 IMPRIMIR
-                </button>
+                </button> */}
             </div>
         </div>
     );
@@ -370,7 +370,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
 
     return (
         <div className='bg-green-800/30 p-2 rounded-lg flex-1 overflow-hidden'>
-            // En cualquier componente
+            {/* // En cualquier componente
             <button
                 onClick={() => {
                     import('../services/browserPrintService').then((module) => {
@@ -379,13 +379,13 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                 }}
             >
                 🖨️ TEST IMPRESIÓN
-            </button>
+            </button> */}
             <h3 className='text-base font-bold mb-2 text-lime-200 text-center'>
-                FACTURAS PENDIENTES ({facturasImpagas.length})
+                FACTURAS PENDIENTES
             </h3>
             {/* GRILLA CON MENOS COLUMNAS para cards más grandes */}
             <div className='h-full overflow-y-auto'>
-                <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 auto-rows-max'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 gap-3 auto-rows-max'>
                     {facturasImpagas.map((factura, index) => (
                         <FacturaCard
                             key={index}

@@ -501,7 +501,7 @@ export default function TASHomeScreen() {
                     </div>
 
                     {/* BOTONES PRINCIPALES */}
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto'>
+                    <div className='grid grid-cols-1 md:grid-cols-1 gap-8 max-w-4xl mx-auto'>
                         {/* Botón Pagar Factura */}
                         <button
                             onClick={irAPagarFactura}
@@ -533,7 +533,7 @@ export default function TASHomeScreen() {
                         </button>
 
                         {/* Botón Imprimir Formularios */}
-                        <button
+                        {/* <button
                             //onClick={irAImprimirFormularios}
                             className='group relative bg-gradient-to-br from-blue-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 p-8 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 active:scale-95 border-4 border-blue-500 hover:border-cyan-400'
                         >
@@ -560,7 +560,7 @@ export default function TASHomeScreen() {
                                 </div>
                             </div>
                             <div className='absolute inset-0 rounded-3xl bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform translate-x-full group-hover:translate-x-[-200%] transition-transform duration-1000'></div>
-                        </button>
+                        </button> */}
                     </div>
                 </div>
             </div>

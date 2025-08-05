@@ -8,32 +8,32 @@ export default function TASCompactSummary({
 
     return (
         <div className='mb-6'>
-            {/* Header con información del cliente */}
-            <div className='grid grid-cols-2 gap-4'>
-                {/* Información del Cliente */}
-                <div className='bg-white/20 backdrop-blur-sm rounded-2xl p-4 border border-white/30'>
-                    <h3 className='text-emerald-200 text-sm uppercase tracking-wide mb-1'>
-                        CLIENTE
-                    </h3>
-                    <p className='text-white text-lg font-bold leading-tight'>
-                        {cliente.NOMBRE}
-                    </p>
-                    <p className='text-emerald-200 text-sm mt-1'>NIS: {nis}</p>
-                </div>
+    {/* Header con información del cliente */}
+    <div className='flex gap-2 justify-center'>
+        {/* Información del Cliente */}
+        <div className='bg-white/20 backdrop-blur-sm rounded-2xl p-4 border border-white/30 w-64 text-center'>
+            <h3 className='text-emerald-200 text-xl uppercase tracking-wide mb-1'>
+                CLIENTE
+            </h3>
+            <p className='text-white text-lg font-bold leading-tight'>
+                {cliente.NOMBRE}
+            </p>
+            <p className='text-emerald-200 text-xl mt-1'>NIS: {nis}</p>
+        </div>
 
-                {/* Deuda Total */}
-                <div className='bg-red-500/30 backdrop-blur-sm rounded-2xl p-4 border border-red-400/50'>
-                    <h3 className='text-red-200 text-sm uppercase tracking-wide mb-1'>
-                        DEUDA TOTAL
-                    </h3>
-                    <p className='text-white text-3xl font-bold'>
-                        ${totalDeuda.toLocaleString()}
-                    </p>
-                </div>
+        {/* Deuda Total */}
+        <div className='bg-red-500/30 backdrop-blur-sm rounded-2xl p-4 border border-red-400/50 w-64 text-center'>
+            <h3 className='text-red-200 text-xl uppercase tracking-wide mb-1'>
+                DEUDA TOTAL
+            </h3>
+            <p className='text-white text-3xl font-bold'>
+                ${totalDeuda.toLocaleString()}
+            </p>
+        </div>
 
                 {/* Próximo Vencimiento */}
                 {/* <div className='bg-orange-500/30 backdrop-blur-sm rounded-2xl p-4 border border-orange-400/50'>
-                    <h3 className='text-orange-200 text-sm uppercase tracking-wide mb-1'>
+                    <h3 className='text-orange-200 text-xl uppercase tracking-wide mb-1'>
                         PRÓXIMO VENCIMIENTO
                     </h3>
                     {proximaFactura ? (
