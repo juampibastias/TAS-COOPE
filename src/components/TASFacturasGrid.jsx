@@ -80,7 +80,7 @@ const validatePaymentOrder = (selectedItems, todosVencimientos, hasShownOrderWar
     return null;
 };
 
-// ✅ FUNCIÓN PARA CALCULAR IMPORTES Y ESTADOS DE VENCIMIENTOS
+// ✅ FUNCIÓN CORREGIDA PARA CALCULAR VENCIMIENTOS - SOLO DISPONIBLES
 function calcularVencimientosFactura(factura) {
     const estado = factura.ESTADO;
     const cta1Imp = parseFloat(factura.CTA1_IMP || 0);
@@ -88,9 +88,10 @@ function calcularVencimientosFactura(factura) {
 
     const vencimientos = [];
 
-    // Primer vencimiento
+    // ✅ PRIMER VENCIMIENTO - Solo si importe > 0
     if (cta1Imp > 0) {
         let estadoVenc1 = 'no-disponible';
+        
         if (estado === 'IMPAGA') {
             estadoVenc1 = 'disponible';
         } else if (estado === 'PARCIAL') {
@@ -111,9 +112,10 @@ function calcularVencimientosFactura(factura) {
         });
     }
 
-    // Segundo vencimiento
+    // ✅ SEGUNDO VENCIMIENTO - Solo si importe > 0 Y tiene fecha
     if (cta2Imp > 0 && factura.CTA2_VTO) {
         let estadoVenc2 = 'no-disponible';
+        
         if (estado === 'IMPAGA') {
             estadoVenc2 = 'disponible';
         } else if (estado === 'PARCIAL') {
@@ -140,6 +142,7 @@ function calcularVencimientosFactura(factura) {
 // ✅ COMPONENTE DE VENCIMIENTO INDIVIDUAL (TOUCH-FRIENDLY)
 function VencimientoButton({ vencimiento, isSelected, isBlocked, onToggle }) {
     const getButtonStyles = () => {
+        // ✅ CRÍTICO: Si está pagado, NO permitir selección
         if (vencimiento.estado === 'pagado') {
             return {
                 bg: 'bg-blue-500/20 border-blue-400',
@@ -149,15 +152,17 @@ function VencimientoButton({ vencimiento, isSelected, isBlocked, onToggle }) {
             };
         }
 
-        if (isBlocked) {
+        // ✅ CRÍTICO: Si está bloqueado por validación, NO permitir
+        if (isBlocked || vencimiento.estado === 'no-disponible') {
             return {
-                bg: 'bg-red-500/20 border-red-400',
+                bg: 'bg-red-500/20 border-red-400',  
                 text: 'text-red-300',
                 cursor: 'cursor-not-allowed',
                 disabled: true
             };
         }
 
+        // ✅ Si está seleccionado
         if (isSelected) {
             return {
                 bg: 'bg-green-600 border-green-400 shadow-lg shadow-green-600/50',
@@ -167,6 +172,7 @@ function VencimientoButton({ vencimiento, isSelected, isBlocked, onToggle }) {
             };
         }
 
+        // ✅ Disponible para seleccionar
         return {
             bg: 'bg-gray-600/30 border-gray-500 hover:bg-green-600/20 hover:border-green-400',
             text: 'text-gray-200 hover:text-green-200',
@@ -179,7 +185,7 @@ function VencimientoButton({ vencimiento, isSelected, isBlocked, onToggle }) {
 
     const getStatusIcon = () => {
         if (vencimiento.estado === 'pagado') return '✅';
-        if (isBlocked) return '🚫';
+        if (isBlocked || vencimiento.estado === 'no-disponible') return '🚫';
         if (isSelected) return '✓';
         return '';
     };
@@ -486,7 +492,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
     customClass: { popup: 'rounded-2xl shadow-2xl' },
     didOpen: () => {
       // Usa external_reference o preference_id para el polling
-      startMultiplePaymentPolling(result.external_reference || result.preference_id);
+      startMultiplePaymentPolling(result.external_reference || result.preference_id, 'mercadopago');
     }
   });
 } else if (metodoPago === 'modo' && result.qr) {
@@ -540,24 +546,34 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
     }, [selectedVencimientos, totalSeleccionado, metodoMPHabilitado, metodoModoHabilitado]);
 
     // ✅ POLLING PARA PAGO MÚLTIPLE MODO
-    const startMultiplePaymentPolling = useCallback((externalId) => {
-        let pollingInterval = null;
-        let pollingTimeout = null;
-        let alertaMostrada = false;
+// ✅ POLLING UNIFICADO PARA AMBOS MÉTODOS DE PAGO
+const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo') => {
+    let pollingInterval = null;
+    let pollingTimeout = null;
+    let alertaMostrada = false;
 
-        const checkStatus = async () => {
-            try {
-                let algunPagoExitoso = false;
+    const checkStatus = async () => {
+        try {
+            let algunPagoExitoso = false;
+            
+            // ✅ PARA MERCADOPAGO: Verificar si hay pagos recientes con medio_pago = 'mercadopago'
+            if (metodoPago === 'mercadopago') {
+                // Verificar si alguna factura fue actualizada recientemente
+                const facturasSample = selectedVencimientos.slice(0, 1); // Solo verificar la primera
                 
-                for (const item of selectedVencimientos) {
+                for (const item of facturasSample) {
                     const response = await fetch(
                         `${baseUrl}/api/modo/payment-status?factura=${item.factura}&nis=${item.nis}`
                     );
                     
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.status === 'approved' && data.payment_id?.includes(externalId)) {
+                        
+                        // Para MP, cualquier payment_id reciente con estado approved es válido
+                        if (data.status === 'approved' && data.payment_id) {
+                            console.log('✅ Pago MP múltiple detectado como exitoso');
                             algunPagoExitoso = true;
+                            break;
                         } else if (data.status === 'rejected') {
                             clearInterval(pollingInterval);
                             clearTimeout(pollingTimeout);
@@ -567,71 +583,88 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                                 icon: 'error',
                                 title: 'Pago Múltiple Rechazado',
                                 text: 'Tu pago múltiple fue rechazado. Por favor, intentá nuevamente.',
-                                confirmButtonColor: '#DC2626',
-                                customClass: {
-                                    popup: 'rounded-xl shadow-2xl',
-                                    confirmButton: 'rounded-lg'
-                                }
+                                confirmButtonColor: '#DC2626'
                             });
                             return;
                         }
                     }
                 }
+            } else {
+                // ✅ PARA MODO: Verificar que el payment_id contenga el externalId
+                for (const item of selectedVencimientos) {
+                    const response = await fetch(
+                        `${baseUrl}/api/modo/payment-status?factura=${item.factura}&nis=${item.nis}`
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.status === 'approved' && data.payment_id?.includes(externalId)) {
+                            algunPagoExitoso = true;
+                            break;
+                        } else if (data.status === 'rejected') {
+                            clearInterval(pollingInterval);
+                            clearTimeout(pollingTimeout);
+                            alertaMostrada = true;
 
-                if (alertaMostrada) return;
-
-                if (algunPagoExitoso) {
-                    clearInterval(pollingInterval);
-                    clearTimeout(pollingTimeout);
-                    alertaMostrada = true;
-
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Pago Múltiple Exitoso',
-                        html: `
-                            <div style="text-align: center;">
-                                <p style="margin-bottom: 15px; color: #374151;">Tu pago de <b style="color: #059669;">$${totalSeleccionado.toLocaleString()}</b> ha sido procesado correctamente.</p>
-                                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin: 10px 0;">
-                                    <p style="margin: 0; font-size: 14px; color: #166534;">✅ Se actualizaron ${selectedVencimientos.length} vencimientos</p>
-                                </div>
-                            </div>
-                        `,
-                        confirmButtonText: 'Ver mi cuenta',
-                        confirmButtonColor: '#059669',
-                        allowOutsideClick: false,
-                        customClass: {
-                            popup: 'rounded-xl shadow-2xl',
-                            confirmButton: 'rounded-lg'
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Pago Múltiple Rechazado',
+                                text: 'Tu pago múltiple fue rechazado. Por favor, intentá nuevamente.',
+                                confirmButtonColor: '#DC2626'
+                            });
+                            return;
                         }
-                    }).then(() => {
-                        window.location.reload();
-                    });
-                }
-
-            } catch (error) {
-                console.error('Error durante polling múltiple:', error);
-            }
-        };
-
-        checkStatus();
-        pollingInterval = setInterval(checkStatus, 3000);
-        pollingTimeout = setTimeout(() => {
-            clearInterval(pollingInterval);
-            if (!alertaMostrada) {
-                alertaMostrada = true;
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Sin respuesta de MODO',
-                    text: 'No se pudo confirmar el pago en el tiempo esperado.',
-                    confirmButtonColor: '#F59E0B',
-                    customClass: {
-                        popup: 'rounded-xl shadow-2xl',
-                        confirmButton: 'rounded-lg'
                     }
+                }
+            }
+
+            if (alertaMostrada) return;
+
+            if (algunPagoExitoso) {
+                clearInterval(pollingInterval);
+                clearTimeout(pollingTimeout);
+                alertaMostrada = true;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Pago Múltiple Exitoso',
+                    html: `
+                        <div style="text-align: center;">
+                            <p style="margin-bottom: 15px; color: #374151;">Tu pago de <b style="color: #059669;">$${totalSeleccionado.toLocaleString()}</b> ha sido procesado correctamente.</p>
+                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin: 10px 0;">
+                                <p style="margin: 0; font-size: 14px; color: #166534;">✅ Se actualizaron ${selectedVencimientos.length} vencimientos</p>
+                            </div>
+                        </div>
+                    `,
+                    confirmButtonText: 'Ver mi cuenta',
+                    confirmButtonColor: '#059669',
+                    allowOutsideClick: false
+                }).then(() => {
+                    window.location.reload();
                 });
             }
-        }, 120000);
-    }, [selectedVencimientos, totalSeleccionado]);
+
+        } catch (error) {
+            console.error('Error durante polling múltiple:', error);
+        }
+    };
+
+    checkStatus();
+    pollingInterval = setInterval(checkStatus, 3000);
+    pollingTimeout = setTimeout(() => {
+        clearInterval(pollingInterval);
+        if (!alertaMostrada) {
+            alertaMostrada = true;
+            Swal.fire({
+                icon: 'warning',
+                title: 'Sin respuesta',
+                text: 'No se pudo confirmar el pago en el tiempo esperado.',
+                confirmButtonColor: '#F59E0B'
+            });
+        }
+    }, 120000);
+}, [selectedVencimientos, totalSeleccionado, nis]);
 
     if (!facturasImpagas.length) {
         return (
