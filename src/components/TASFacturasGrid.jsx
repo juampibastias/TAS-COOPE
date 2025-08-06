@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import Swal from 'sweetalert2';
+import { imprimirTicketPagoMultiple } from '../services/multiplePaymentPrintService';
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 const metodoModoHabilitado = process.env.NEXT_PUBLIC_MODO_ENABLED === 'true';
@@ -627,22 +628,41 @@ const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo'
                 alertaMostrada = true;
 
                 Swal.fire({
-                    icon: 'success',
-                    title: 'Pago Múltiple Exitoso',
-                    html: `
-                        <div style="text-align: center;">
-                            <p style="margin-bottom: 15px; color: #374151;">Tu pago de <b style="color: #059669;">$${totalSeleccionado.toLocaleString()}</b> ha sido procesado correctamente.</p>
-                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin: 10px 0;">
-                                <p style="margin: 0; font-size: 14px; color: #166534;">✅ Se actualizaron ${selectedVencimientos.length} vencimientos</p>
-                            </div>
-                        </div>
-                    `,
-                    confirmButtonText: 'Ver mi cuenta',
-                    confirmButtonColor: '#059669',
-                    allowOutsideClick: false
-                }).then(() => {
-                    window.location.reload();
-                });
+    icon: 'success',
+    title: 'Pago Múltiple Exitoso',
+    html: `
+        <div style="text-align: center;">
+            <p style="margin-bottom: 15px; color: #374151;">Tu pago de <b style="color: #059669;">$${totalSeleccionado.toLocaleString()}</b> ha sido procesado correctamente.</p>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin: 10px 0;">
+                <p style="margin: 0; font-size: 14px; color: #166534;">✅ Se actualizaron ${selectedVencimientos.length} vencimientos</p>
+            </div>
+            <div style="background: #f3f4f6; border-radius: 8px; padding: 8px; margin: 10px 0;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280;">🖨️ Generando comprobante...</p>
+            </div>
+        </div>
+    `,
+    confirmButtonText: 'Ver mi cuenta',
+    confirmButtonColor: '#059669',
+    allowOutsideClick: false,
+    didOpen: () => {
+        // ✅ DISPARAR IMPRESIÓN AUTOMÁTICA
+        setTimeout(async () => {
+            try {
+                await imprimirTicketPagoMultiple(
+                    selectedVencimientos,
+                    nis,
+                    'CLIENTE', // Obtener nombre real del cliente
+                    metodoPago.toUpperCase(),
+                    `MULTI_${Date.now()}`
+                );
+            } catch (error) {
+                console.error('Error en impresión automática:', error);
+            }
+        }, 500);
+    }
+}).then(() => {
+    window.location.reload();
+});
             }
 
         } catch (error) {
