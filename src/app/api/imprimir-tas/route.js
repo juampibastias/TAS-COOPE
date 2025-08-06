@@ -86,6 +86,7 @@ export async function POST(request) {
                 vencimiento: datos.vencimiento || '1° Vencimiento',
                 metodoPago: datos.metodoPago || 'MERCADOPAGO',
                 transaccion: datos.transactionId || datos.transaccion || 'N/A',
+                payment_id: datos.payment_id || datos.transaccion || 'N/A',
                 // 🆕 Metadatos VPN
                 vpnInfo: {
                     clientIP: clientInfo.ip,

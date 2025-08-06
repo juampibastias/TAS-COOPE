@@ -56,7 +56,7 @@ export function prepararDatosTicketMultiple(selectedItems, nis, clienteNombre, m
         const totalSegundos = segundosVencimientos.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
         resumenTipos += `${segundosVencimientos.length} Segundos Vencimientos: $${totalSegundos.toLocaleString()}`;
     }
-
+    
     return {
         cliente: clienteNombre,
         nis: nis,
@@ -298,7 +298,7 @@ export async function imprimirTicketPagoMultiple(selectedItems, nis, clienteNomb
             allowOutsideClick: false,
             allowEscapeKey: false,
             showConfirmButton: false,
-            timer: 2000,
+            timer: 3000,
             didOpen: () => {
                 Swal.showLoading();
             },
