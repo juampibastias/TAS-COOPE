@@ -60,7 +60,7 @@ export function prepararDatosTicketMultiple(selectedItems, nis, clienteNombre, m
     return {
         cliente: clienteNombre,
         nis: nis,
-        factura: 'PAGO MÚLTIPLE',
+        factura: 'PAGO MULTIPLE',
         fecha: ahora.toLocaleDateString('es-AR'),
         importe: totalImporte.toString(),
         vencimiento: `${selectedItems.length} vencimientos`,

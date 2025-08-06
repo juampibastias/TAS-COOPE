@@ -104,7 +104,7 @@ function calcularVencimientosFactura(factura) {
         vencimientos.push({
             id: `${factura.NROFACT}-1`,
             nroFactura: factura.NROFACT,
-            tipo: '1°',
+            tipo: '1',
             fecha: factura.CTA1_VTO,
             importe: cta1Imp,
             estado: estadoVenc1,
@@ -128,7 +128,7 @@ function calcularVencimientosFactura(factura) {
         vencimientos.push({
             id: `${factura.NROFACT}-2`,
             nroFactura: factura.NROFACT,
-            tipo: '2°',
+            tipo: '2',
             fecha: factura.CTA2_VTO,
             importe: cta2Imp,
             estado: estadoVenc2,
@@ -212,7 +212,7 @@ function VencimientoButton({ vencimiento, isSelected, isBlocked, onToggle }) {
                         <span className="text-lg">{getStatusIcon()}</span>
                     )}
                 </div>
-                <span className="text-sm opacity-80">
+                <span className="text-xl opacity-80">
                     ${vencimiento.importe.toLocaleString()}
                 </span>
             </div>
@@ -247,7 +247,7 @@ function FacturaCard({ factura, vencimientos, selectedVencimientos, onVencimient
                 <div>
                     <p className='text-red-200 text-xl uppercase'>FACTURA</p>
                     <p className='text-white font-mono text-xl font-bold'>
-                        N° {factura.NROFACT}
+                        N {factura.NROFACT}
                     </p>
                 </div>
                 <div className='text-right'>
@@ -282,7 +282,7 @@ function FloatingPayButton({ selectedCount, totalAmount, onPay, isProcessing }) 
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 animate-bounce-in">
             <div className="bg-gradient-to-r from-green-600 to-lime-600 rounded-2xl shadow-2xl border border-green-400 p-4">
                 <div className="text-center mb-3">
-                    <div className="text-white text-sm font-medium">
+                    <div className="text-white text-xl font-medium">
                         {selectedCount} vencimiento{selectedCount > 1 ? 's' : ''} seleccionado{selectedCount > 1 ? 's' : ''}
                     </div>
                     <div className="text-white text-xl font-bold">
@@ -360,7 +360,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Orden de pago incorrecto',
-                        text: `Debes seleccionar primero el 1° vencimiento de la factura ${vencimiento.nroFactura}.`,
+                        text: `Debes seleccionar primero el 1 vencimiento de la factura ${vencimiento.nroFactura}.`,
                         confirmButtonColor: '#dc2626',
                         customClass: {
                             popup: 'rounded-xl shadow-2xl',
@@ -379,7 +379,7 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
             factura: vencimiento.nroFactura,
             vencimiento: vencimiento.fecha,
             amount: vencimiento.importe,
-            tipo: vencimiento.tipo === '1°' ? '1° Vencimiento' : '2° Vencimiento',
+            tipo: vencimiento.tipo === '1' ? '1 Vencimiento' : '2 Vencimiento',
             descripcion: `Factura ${vencimiento.nroFactura} - ${vencimiento.tipo} Vencimiento`,
             importe: vencimiento.importe
         }];
