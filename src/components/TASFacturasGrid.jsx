@@ -225,18 +225,61 @@ function FacturaCard({ factura, vencimientos, selectedVencimientos, onVencimient
     const saldo = parseFloat(factura.SALDO || 0);
 
     const isVencimientoBlocked = (vencimiento) => {
-        // Si es el segundo vencimiento, verificar que el primero esté seleccionado
-        if (vencimiento.vencimiento === '2') {
-            const primerVencimiento = vencimientos.find(v => v.nroFactura === vencimiento.nroFactura && v.vencimiento === '1');
-            if (primerVencimiento && primerVencimiento.estado === 'disponible') {
-                const primerSeleccionado = selectedVencimientos.some(s => s.id === primerVencimiento.id);
-                if (!primerSeleccionado) {
-                    return true;
+    // ✅ LÓGICA EXISTENTE: Dentro de la misma factura
+    if (vencimiento.vencimiento === '2') {
+        const primerVencimiento = vencimientos.find(v => v.nroFactura === vencimiento.nroFactura && v.vencimiento === '1');
+        if (primerVencimiento && primerVencimiento.estado === 'disponible') {
+            const primerSeleccionado = selectedVencimientos.some(s => s.id === primerVencimiento.id);
+            if (!primerSeleccionado) {
+                return true;
+            }
+        }
+    }
+
+    // 🔥 NUEVA LÓGICA: Entre facturas (solo 3-4 líneas)
+    // Obtener todas las facturas con vencimientos disponibles, ordenadas por fecha más antigua
+    const facturasPorVencimiento = new Map();
+    vencimientos.forEach(v => {
+        if (v.estado === 'disponible') {
+            const fechaVencimiento = parsearFecha(v.fecha);
+            if (!facturasPorVencimiento.has(v.nroFactura)) {
+                facturasPorVencimiento.set(v.nroFactura, {
+                    numero: v.nroFactura,
+                    fechaMasAntigua: fechaVencimiento
+                });
+            } else {
+                const facturaExistente = facturasPorVencimiento.get(v.nroFactura);
+                if (fechaVencimiento < facturaExistente.fechaMasAntigua) {
+                    facturaExistente.fechaMasAntigua = fechaVencimiento;
                 }
             }
         }
-        return false;
-    };
+    });
+
+    const facturasOrdenadas = Array.from(facturasPorVencimiento.values())
+        .sort((a, b) => a.fechaMasAntigua - b.fechaMasAntigua);
+
+    // Verificar si hay facturas anteriores con vencimientos sin pagar/seleccionar
+    const indiceFacturaActual = facturasOrdenadas.findIndex(f => f.numero === vencimiento.nroFactura);
+    
+    for (let i = 0; i < indiceFacturaActual; i++) {
+        const facturaAnterior = facturasOrdenadas[i];
+        const vencimientosFacturaAnterior = vencimientos.filter(v => 
+            v.nroFactura === facturaAnterior.numero && v.estado === 'disponible'
+        );
+        
+        // Verificar si todos los vencimientos de la factura anterior están pagados o seleccionados
+        const todosPagadosOSeleccionados = vencimientosFacturaAnterior.every(v => 
+            v.estado === 'pagado' || selectedVencimientos.some(s => s.id === v.id)
+        );
+        
+        if (!todosPagadosOSeleccionados) {
+            return true; // Bloquear este vencimiento
+        }
+    }
+
+    return false;
+};
 
     const facturaVencimientos = vencimientos.filter(v => v.nroFactura === factura.NROFACT);
 
