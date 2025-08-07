@@ -537,11 +537,9 @@ export default function ImprimirFormulariosPage() {
                 style={{ backgroundColor: '#00983f' }}
             >
                 <div className='flex justify-between items-center max-w-6xl mx-auto'>
+                    <span></span>
                     <span>🔒 Conexión segura</span>
-                    <span>Presione ESC para volver al menú principal</span>
-                    <span>
-                        💡 Seleccione un formulario para ver la vista previa
-                    </span>
+                    <span></span>
                 </div>
             </div>
         </div>

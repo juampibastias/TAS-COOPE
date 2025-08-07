@@ -288,9 +288,9 @@ function FacturaCard({ factura, vencimientos, selectedVencimientos, onVencimient
             {/* Header */}
             <div className='flex justify-between items-start mb-4'>
                 <div>
-                    <p className='text-red-200 text-xl uppercase'>FACTURA</p>
-                    <p className='text-white font-mono text-xl font-bold'>
-                        N {factura.NROFACT}
+                    <p className='text-red-200 text-xs uppercase'>FACTURA</p>
+                    <p className='text-white font-mono text-sm font-bold'>
+                        N° {factura.NROFACT}
                     </p>
                 </div>
                 <div className='text-right'>
@@ -300,59 +300,104 @@ function FacturaCard({ factura, vencimientos, selectedVencimientos, onVencimient
                     </p>
                 </div>
             </div>
-
-            {/* Vencimientos seleccionables */}
-            <div className='flex-1 space-y-2'>
-                {facturaVencimientos.map((vencimiento) => (
-                    <VencimientoButton
-                        key={vencimiento.id}
-                        vencimiento={vencimiento}
-                        isSelected={selectedVencimientos.some(s => s.id === vencimiento.id)}
-                        isBlocked={isVencimientoBlocked(vencimiento)}
-                        onToggle={onVencimientoToggle}
-                    />
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// ✅ BOTÓN FLOTANTE DE PAGO MÚLTIPLE
-function FloatingPayButton({ selectedCount, totalAmount, onPay, isProcessing }) {
-    if (selectedCount === 0) return null;
-
-    return (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 animate-bounce-in">
-            <div className="bg-gradient-to-r from-green-600 to-lime-600 rounded-2xl shadow-2xl border border-green-400 p-4">
-                <div className="text-center mb-3">
-                    <div className="text-white text-xl font-medium">
-                        {selectedCount} vencimiento{selectedCount > 1 ? 's' : ''} seleccionado{selectedCount > 1 ? 's' : ''}
-                    </div>
-                    <div className="text-white text-xl font-bold">
-                        Total: ${totalAmount.toLocaleString()}
+            {/* Vencimientos con estados correctos */}
+            <div className='flex-1 mb-3'>
+                {/* Primer vencimiento */}
+                <div
+                    className={`p-2 rounded mb-1 ${
+                        calculado.estadoPago1 === 'PAGADO'
+                            ? 'bg-blue-900/30 border border-blue-500'
+                            : 'bg-green-900/30'
+                    }`}
+                >
+                    <div className='flex justify-between items-center'>
+                        <span
+                            className={`text-xs ${
+                                calculado.estadoPago1 === 'PAGADO'
+                                    ? 'text-blue-200'
+                                    : 'text-green-200'
+                            }`}
+                        >
+                            1° {factura.CTA1_VTO}
+                        </span>
+                        <div className='flex items-center gap-1'>
+                            <span
+                                className={`font-bold text-xs ${
+                                    calculado.estadoPago1 === 'PAGADO'
+                                        ? 'text-blue-100'
+                                        : 'text-green-100'
+                                }`}
+                            >
+                                ${calculado.importe1.toLocaleString()}
+                            </span>
+                            {calculado.estadoPago1 === 'PAGADO' && (
+                                <span className='text-blue-200 text-[10px]'>
+                                    ✅
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
-                
-                <button
-                    onClick={onPay}
-                    disabled={isProcessing}
-                    className={`
-                        w-full px-8 py-4 rounded-xl text-white text-lg font-bold
-                        transition-all duration-300 active:scale-95 touch-manipulation
-                        ${isProcessing 
-                            ? 'bg-gray-500 cursor-not-allowed' 
-                            : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl'
-                        }
-                    `}
-                >
-                    {isProcessing ? (
-                        <div className="flex items-center justify-center space-x-2">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                            <span>Procesando...</span>
+
+                {/* Segundo vencimiento (si existe) */}
+                {calculado.tieneSegundoVencimiento && (
+                    <div
+                        className={`p-2 rounded ${
+                            calculado.estadoPago2 === 'PAGADO'
+                                ? 'bg-blue-900/30 border border-blue-500'
+                                : 'bg-orange-900/30'
+                        }`}
+                    >
+                        <div className='flex justify-between items-center'>
+                            <span
+                                className={`text-xs ${
+                                    calculado.estadoPago2 === 'PAGADO'
+                                        ? 'text-blue-200'
+                                        : 'text-orange-200'
+                                }`}
+                            >
+                                2° {factura.CTA2_VTO}
+                            </span>
+                            <div className='flex items-center gap-1'>
+                                <span
+                                    className={`font-bold text-xs ${
+                                        calculado.estadoPago2 === 'PAGADO'
+                                            ? 'text-blue-100'
+                                            : 'text-orange-100'
+                                    }`}
+                                >
+                                    ${calculado.importe2.toLocaleString()}
+                                </span>
+                                {calculado.estadoPago2 === 'PAGADO' && (
+                                    <span className='text-blue-200 text-[10px]'>
+                                        ✅
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                    ) : (
-                        '💳 PAGAR SELECCIONADOS'
-                    )}
+                    </div>
+                )}
+            </div>
+            {/* Botones */}
+            <div className='grid grid-cols-2 gap-2'>
+                <button
+                    onClick={() => onPagar(factura)}
+                    disabled={
+                        !calculado.habilitarPago1 && !calculado.habilitarPago2
+                    }
+                    className={`px-2 py-2 rounded text-white text-xs font-bold transition-all hover:scale-105 flex items-center justify-center ${
+                        calculado.habilitarPago1 || calculado.habilitarPago2
+                            ? 'bg-green-600 hover:bg-green-500 cursor-pointer'
+                            : 'bg-gray-600 cursor-not-allowed opacity-50'
+                    }`}
+                >
+                    💳 PAGAR
+                </button>
+                <button
+                    onClick={() => onDescargar(factura)}
+                    className='bg-blue-600 hover:bg-blue-500 px-2 py-2 rounded text-white text-xs font-bold transition-all hover:scale-105 flex items-center justify-center'
+                >
+                    📄 IMPRIMIR
                 </button>
             </div>
         </div>
@@ -952,13 +997,23 @@ if (algunPagoExitoso) {
     }
 
     return (
-        <div className='bg-green-800/30 p-2 rounded-lg flex-1 overflow-hidden relative'>
+        <div className='bg-green-800/30 p-2 rounded-lg flex-1 overflow-hidden'>
+            // En cualquier componente
+            <button
+                onClick={() => {
+                    import('../services/browserPrintService').then((module) => {
+                        module.testImpresion();
+                    });
+                }}
+            >
+                🖨️ TEST IMPRESIÓN
+            </button>
             <h3 className='text-base font-bold mb-2 text-lime-200 text-center'>
-                FACTURAS PENDIENTES - SELECCIONA VENCIMIENTOS
+                FACTURAS PENDIENTES ({facturasImpagas.length})
             </h3>
-            
-            <div className='h-full overflow-y-auto pb-32'>
-                <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 gap-3 auto-rows-max'>
+            {/* GRILLA CON MENOS COLUMNAS para cards más grandes */}
+            <div className='h-full overflow-y-auto'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 auto-rows-max'>
                     {facturasImpagas.map((factura, index) => (
                         <FacturaCard
                             key={index}
