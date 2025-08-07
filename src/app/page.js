@@ -501,7 +501,7 @@ export default function TASHomeScreen() {
                     </div>
 
                     {/* BOTONES PRINCIPALES */}
-                    <div className='grid grid-cols-1 md:grid-cols-1 gap-16 max-w-4xl mx-auto'>
+                    <div className='grid grid-cols-1 md:grid-cols-1 gap-8 max-w-xl mx-auto'>
                         {/* Botón Pagar Factura */}
                         <button
                             onClick={irAPagarFactura}

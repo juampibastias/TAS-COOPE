@@ -63,13 +63,13 @@ function FacturaCard({ factura, nis, onPagar, onDescargar }) {
             <div className='flex justify-between items-start mb-2'>
                 <div>
                     <p className='text-red-200 text-xs uppercase'>FACTURA</p>
-                    <p className='text-white font-mono text-sm font-bold'>
+                    <p className='text-white font-mono text-xl font-bold'>
                         N° {factura.NROFACT}
                     </p>
                 </div>
                 <div className='text-right'>
                     <p className='text-red-200 text-xs uppercase'>SALDO</p>
-                    <p className='text-white text-sm font-bold'>
+                    <p className='text-white text-xl font-bold'>
                         ${saldo.toLocaleString()}
                     </p>
                 </div>

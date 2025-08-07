@@ -240,7 +240,7 @@ export default function ImprimirFormulariosPage() {
                     <div className='flex items-center gap-4'>
                         <button
                             onClick={volverAlHome}
-                            className='bg-red-600 hover:bg-red-500 px-4 py-2 rounded-lg text-white font-bold transition-colors text-sm flex items-center gap-2'
+                            className='bg-red-600 hover:bg-red-500 px-4 py-2 rounded-lg text-white font-bold transition-colors text-xl flex items-center gap-2'
                         >
                             ← VOLVER
                         </button>
@@ -254,11 +254,11 @@ export default function ImprimirFormulariosPage() {
                         <h1 className='text-2xl font-bold text-white'>
                             🖨️ IMPRIMIR FORMULARIOS
                         </h1>
-                        <p className='text-white/90 text-sm'>
+                        <p className='text-white/90 text-xl'>
                             Seleccione el formulario que desea imprimir
                         </p>
                     </div>
-                    <div className='text-right text-sm text-white/80'>
+                    <div className='text-right text-xl text-white/80'>
                         <div>{new Date().toLocaleDateString()}</div>
                         <div>{new Date().toLocaleTimeString()}</div>
                     </div>
@@ -358,7 +358,7 @@ export default function ImprimirFormulariosPage() {
                                                         formulario.title}
                                                 </h4>
                                                 <div
-                                                    className='text-sm text-green-200'
+                                                    className='text-xl text-green-200'
                                                     dangerouslySetInnerHTML={{
                                                         __html:
                                                             formulario.descripcionHtml ||
@@ -396,7 +396,7 @@ export default function ImprimirFormulariosPage() {
                                                 formularioSeleccionado.title}
                                         </h3>
                                         <div
-                                            className='text-sm text-green-200'
+                                            className='text-xl text-green-200'
                                             dangerouslySetInnerHTML={{
                                                 __html:
                                                     formularioSeleccionado.descripcionHtml ||
@@ -407,7 +407,7 @@ export default function ImprimirFormulariosPage() {
                                     </div>
                                     <button
                                         onClick={cerrarPreview}
-                                        className='bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-white font-bold transition-colors text-sm'
+                                        className='bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-white font-bold transition-colors text-xl'
                                     >
                                         ✕
                                     </button>
@@ -533,7 +533,7 @@ export default function ImprimirFormulariosPage() {
 
             {/* FOOTER */}
             <div
-                className='p-4 text-center text-green-200 text-sm'
+                className='p-4 text-center text-green-200 text-xl'
                 style={{ backgroundColor: '#00983f' }}
             >
                 <div className='flex justify-between items-center max-w-6xl mx-auto'>

@@ -6,12 +6,16 @@ import TASLoading from './TASLoading';
 import TASCompactSummary from '../components/TASCompactSummary';
 import TASFacturasGrid from '../components/TASFacturasGrid';
 
+const logoPath = process.env.NODE_ENV === 'production' 
+    ? '/tas-coope/logo.png' 
+    : '/logo.png';
+
 // Componente de Header optimizado
 function Header({ onExit }) {
     return (
         <div className='bg-gradient-to-r from-green-800 to-lime-600 p-4 shadow-lg'>
             <div className='flex justify-between items-center'>
-                <img src='/LOGO.png' alt='Logo' className='h-12' />
+                <img src={logoPath} alt='Logo' className='h-12' />
                 <h1 className='text-xl font-bold text-center flex-1 mx-4'>
                     ESTADO DE CUENTA
                 </h1>
