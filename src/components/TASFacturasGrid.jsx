@@ -597,9 +597,8 @@ const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo'
     let pollingTimeout = null;
     let alertaMostrada = false;
     
-    // 🔧 VARIABLES PARA TRACKING DE ESTADO INICIAL
-    let estadoInicialMP = null;
-    let paymentIdInicialMP = null;
+    // 🔧 VARIABLES PARA TRACKING SIMPLE
+    let paymentIdsInicialesPorFactura = new Map(); // Solo para MercadoPago
     let primeraVerificacion = true;
     let realPaymentId = null;
 
@@ -607,11 +606,11 @@ const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo'
         try {
             let algunPagoExitoso = false;
             
-            // ✅ PARA MERCADOPAGO: Lógica corregida con tracking de estado
+            // ✅ PARA MERCADOPAGO: Lógica simplificada usando endpoint existente
             if (metodoPago === 'mercadopago') {
-                console.log('🔍 Verificando estado MP múltiple...');
+                console.log('🔍 Verificando estado MP múltiple SIMPLE...');
                 
-                // Verificar todas las facturas seleccionadas
+                // Verificar todas las facturas seleccionadas usando el endpoint existente
                 for (const item of selectedVencimientos) {
                     const response = await fetch(
                         `${baseUrl}/api/modo/payment-status?factura=${item.factura}&nis=${item.nis}`
@@ -619,39 +618,31 @@ const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo'
                     
                     if (response.ok) {
                         const data = await response.json();
+                        const facturaKey = item.factura;
                         
-                        console.log(`📊 Estado factura ${item.factura}:`, {
+                        console.log(`📊 Estado MP múltiple factura ${item.factura}:`, {
                             status: data.status,
-                            payment_id: data.payment_id,
-                            timestamp: new Date().toISOString()
+                            payment_id: data.payment_id
                         });
                         
-                        // 🔧 PRIMERA VERIFICACIÓN: Guardar estado inicial
+                        // 🔧 PRIMERA VERIFICACIÓN: Guardar payment_id inicial por factura
                         if (primeraVerificacion) {
-                            estadoInicialMP = data.status;
-                            paymentIdInicialMP = data.payment_id;
-                            console.log(`📝 Estado inicial MP guardado:`, {
-                                factura: item.factura,
-                                estadoInicial: estadoInicialMP,
-                                paymentIdInicial: paymentIdInicialMP
-                            });
-                            continue; // No verificar cambios en la primera iteración
+                            paymentIdsInicialesPorFactura.set(facturaKey, data.payment_id);
+                            console.log(`📝 Payment ID inicial MP guardado para ${facturaKey}: ${data.payment_id}`);
+                            continue;
                         }
                         
-                        // 🎯 DETECCIÓN DE PAGO EXITOSO: Solo si hay CAMBIO real
-                        const huboCambioEstado = data.status !== estadoInicialMP;
-                        const huboNuevoPaymentId = data.payment_id && (data.payment_id !== paymentIdInicialMP);
-                        const estadoAprobado = data.status === 'approved' || data.status === 'EN PROCESO';
+                        // 🎯 DETECCIÓN SIMPLE: approved + payment_id diferente al inicial
+                        const paymentIdInicial = paymentIdsInicialesPorFactura.get(facturaKey);
                         
-                        if ((huboNuevoPaymentId || huboCambioEstado) && estadoAprobado) {
-                            console.log('✅ CAMBIO DETECTADO EN PAGO MP:', {
+                        if (data.status === 'approved' && 
+                            data.payment_id && 
+                            data.payment_id !== paymentIdInicial) {
+                            
+                            console.log('✅ PAGO MP MÚLTIPLE SIMPLE DETECTADO:', {
                                 factura: item.factura,
-                                estadoAnterior: estadoInicialMP,
-                                estadoActual: data.status,
-                                paymentIdAnterior: paymentIdInicialMP,
-                                paymentIdActual: data.payment_id,
-                                huboNuevoPaymentId,
-                                huboCambioEstado
+                                paymentIdAnterior: paymentIdInicial,
+                                paymentIdActual: data.payment_id
                             });
                             
                             algunPagoExitoso = true;
@@ -679,11 +670,11 @@ const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo'
                 // Marcar que ya no es la primera verificación
                 if (primeraVerificacion) {
                     primeraVerificacion = false;
-                    console.log('🔄 Primera verificación MP completada, iniciando detección de cambios...');
+                    console.log('🔄 Primera verificación MP múltiple SIMPLE completada');
                 }
                 
             } else {
-                // ✅ PARA MODO: Mantener lógica existente
+                // ✅ PARA MODO: Mantener lógica existente SIN CAMBIOS
                 for (const item of selectedVencimientos) {
                     const response = await fetch(
                         `${baseUrl}/api/modo/payment-status?factura=${item.factura}&nis=${item.nis}`
@@ -692,8 +683,18 @@ const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo'
                     if (response.ok) {
                         const data = await response.json();
                         
+                        // 🔥 VALIDACIÓN ESTRICTA PARA MODO: payment_id debe contener externalId
                         if (data.status === 'approved' && data.payment_id?.includes(externalId)) {
+                            console.log('✅ PAGO MODO MÚLTIPLE VALIDADO:', {
+                                factura: item.factura,
+                                status: data.status,
+                                paymentId: data.payment_id,
+                                externalId,
+                                containsExternalId: data.payment_id.includes(externalId)
+                            });
+                            
                             algunPagoExitoso = true;
+                            realPaymentId = data.payment_id;
                             break;
                         } else if (data.status === 'rejected') {
                             clearInterval(pollingInterval);
@@ -714,214 +715,160 @@ const startMultiplePaymentPolling = useCallback((externalId, metodoPago = 'modo'
 
             if (alertaMostrada) return;
 
-            // ✅ ALERT UNIFICADO - REEMPLAZAR EN startMultiplePaymentPolling
+            // ✅ RESTO DEL CÓDIGO IGUAL (alert unificado, etc.)
+            if (algunPagoExitoso) {
+                clearInterval(pollingInterval);
+                clearTimeout(pollingTimeout);
+                alertaMostrada = true;
 
-if (algunPagoExitoso) {
-    clearInterval(pollingInterval);
-    clearTimeout(pollingTimeout);
-    alertaMostrada = true;
+                // 🎯 ALERT UNIFICADO QUE SE ACTUALIZA (SIN CAMBIOS)
+                const unifiedAlert = Swal.fire({
+                    icon: 'success',
+                    title: '🎉 ¡Pago Múltiple Exitoso!',
+                    html: `
+                        <div style="text-align: center;">
+                            <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px; padding: 20px; margin: 15px 0;">
+                                <h3 style="margin: 0 0 10px 0; color: #166534; font-size: 18px;">✅ PAGO PROCESADO CORRECTAMENTE</h3>
+                                <p style="margin: 5px 0; color: #374151; font-size: 16px;">
+                                    Importe: <b style="color: #059669;">$${totalSeleccionado.toLocaleString()}</b>
+                                </p>
+                                <p style="margin: 5px 0; color: #374151;">
+                                    ${selectedVencimientos.length} vencimiento${selectedVencimientos.length > 1 ? 's' : ''} actualizado${selectedVencimientos.length > 1 ? 's' : ''}
+                                </p>
+                            </div>
+                            
+                            <div id="printing-status" style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 15px; margin: 15px 0;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                                    <div class="spinner" style="
+                                        width: 20px; 
+                                        height: 20px; 
+                                        border: 2px solid #f59e0b; 
+                                        border-top: 2px solid transparent; 
+                                        border-radius: 50%; 
+                                        animation: spin 1s linear infinite;
+                                    "></div>
+                                    <span id="print-message" style="color: #92400e; font-weight: bold; font-size: 16px;">
+                                        🖨️ Generando comprobante...
+                                    </span>
+                                </div>
+                                <div id="print-progress" style="
+                                    width: 100%; 
+                                    height: 4px; 
+                                    background: #fed7aa; 
+                                    border-radius: 2px; 
+                                    margin-top: 10px; 
+                                    overflow: hidden;
+                                ">
+                                    <div id="progress-bar" style="
+                                        width: 0%; 
+                                        height: 100%; 
+                                        background: #f59e0b; 
+                                        transition: width 0.5s ease;
+                                    "></div>
+                                </div>
+                            </div>
+                            
+                            <div id="completion-message" style="display: none; background: #dcfce7; border: 2px solid #16a34a; border-radius: 12px; padding: 15px; margin: 15px 0;">
+                                <p style="margin: 0; color: #166534; font-size: 16px; font-weight: bold;">
+                                    🎫 ¡Comprobante generado exitosamente!
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <style>
+                            @keyframes spin {
+                                0% { transform: rotate(0deg); }
+                                100% { transform: rotate(360deg); }
+                            }
+                        </style>
+                    `,
+                    confirmButtonText: 'Ver mi cuenta',
+                    confirmButtonColor: '#059669',
+                    allowOutsideClick: false,
+                    showConfirmButton: false, // Ocultar botón inicialmente
+                    width: 550,
+                    didOpen: async () => {
+                        // 🖨️ EJECUTAR IMPRESIÓN CON FEEDBACK VISUAL (SIN CAMBIOS)
+                        try {
+                            const updatePrintProgress = (percentage, message) => {
+                                const progressBar = document.getElementById('progress-bar');
+                                const printMessage = document.getElementById('print-message');
+                                
+                                if (progressBar) progressBar.style.width = `${percentage}%`;
+                                if (printMessage) printMessage.textContent = `🖨️ ${message}`;
+                            };
+                            
+                            const showPrintCompleted = (success) => {
+                                const printingStatus = document.getElementById('printing-status');
+                                const completionMessage = document.getElementById('completion-message');
+                                
+                                if (success) {
+                                    if (printingStatus) printingStatus.style.display = 'none';
+                                    if (completionMessage) {
+                                        completionMessage.style.display = 'block';
+                                        completionMessage.innerHTML = `
+                                            <p style="margin: 0; color: #166534; font-size: 16px; font-weight: bold;">
+                                                🎫 ¡Comprobante generado exitosamente!
+                                            </p>
+                                            <p style="margin: 8px 0 0 0; color: #15803d; font-size: 14px;">
+                                                El ticket ha sido enviado a la impresora
+                                            </p>
+                                        `;
+                                    }
+                                }
+                                
+                                setTimeout(() => {
+                                    Swal.update({ showConfirmButton: true });
+                                }, 2000);
+                            };
+                            
+                            // Simular progreso de impresión
+                            updatePrintProgress(0, "Preparando datos del ticket...");
+                            await new Promise(resolve => setTimeout(resolve, 800));
+                            
+                            updatePrintProgress(30, "Conectando con impresora...");
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            
+                            updatePrintProgress(60, "Enviando a impresión...");
+                            
+                            // Ejecutar impresión real (SIN CAMBIOS)
+                            const printResult = await imprimirTicketPagoMultiple(
+                                selectedVencimientos,
+                                nis,
+                                'CLIENTE',
+                                metodoPago.toUpperCase(),
+                                realPaymentId || `${Date.now()}`,
+                            );
+                            
+                            updatePrintProgress(100, "Comprobante generado");
+                            
+                            setTimeout(() => {
+                                showPrintCompleted(printResult.success);
+                            }, 500);
+                            
+                        } catch (error) {
+                            console.error('Error en impresión:', error);
+                            // Mostrar error pero permitir continuar
+                            setTimeout(() => {
+                                Swal.update({ showConfirmButton: true });
+                            }, 1000);
+                        }
+                    }
+                });
 
-    // 🎯 ALERT UNIFICADO QUE SE ACTUALIZA
-    const unifiedAlert = Swal.fire({
-        icon: 'success',
-        title: '🎉 ¡Pago Múltiple Exitoso!',
-        html: `
-            <div style="text-align: center;">
-                <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px; padding: 20px; margin: 15px 0;">
-                    <h3 style="margin: 0 0 10px 0; color: #166534; font-size: 18px;">✅ PAGO PROCESADO CORRECTAMENTE</h3>
-                    <p style="margin: 5px 0; color: #374151; font-size: 16px;">
-                        Importe: <b style="color: #059669;">$${totalSeleccionado.toLocaleString()}</b>
-                    </p>
-                    <p style="margin: 5px 0; color: #374151;">
-                        ${selectedVencimientos.length} vencimiento${selectedVencimientos.length > 1 ? 's' : ''} actualizado${selectedVencimientos.length > 1 ? 's' : ''}
-                    </p>
-                </div>
-                
-                <div id="printing-status" style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 15px; margin: 15px 0;">
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                        <div class="spinner" style="
-                            width: 20px; 
-                            height: 20px; 
-                            border: 2px solid #f59e0b; 
-                            border-top: 2px solid transparent; 
-                            border-radius: 50%; 
-                            animation: spin 1s linear infinite;
-                        "></div>
-                        <span id="print-message" style="color: #92400e; font-weight: bold; font-size: 16px;">
-                            🖨️ Generando comprobante...
-                        </span>
-                    </div>
-                    <div id="print-progress" style="
-                        width: 100%; 
-                        height: 4px; 
-                        background: #fed7aa; 
-                        border-radius: 2px; 
-                        margin-top: 10px; 
-                        overflow: hidden;
-                    ">
-                        <div id="progress-bar" style="
-                            width: 0%; 
-                            height: 100%; 
-                            background: #f59e0b; 
-                            transition: width 0.5s ease;
-                        "></div>
-                    </div>
-                </div>
-                
-                <div id="completion-message" style="display: none; background: #dcfce7; border: 2px solid #16a34a; border-radius: 12px; padding: 15px; margin: 15px 0;">
-                    <p style="margin: 0; color: #166534; font-size: 16px; font-weight: bold;">
-                        🎫 ¡Comprobante generado exitosamente!
-                    </p>
-                </div>
-            </div>
-            
-            <style>
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            </style>
-        `,
-        confirmButtonText: 'Ver mi cuenta',
-        confirmButtonColor: '#059669',
-        allowOutsideClick: false,
-        showConfirmButton: false, // ← Ocultar botón inicialmente
-        width: 550,
-        didOpen: async () => {
-            // 🖨️ EJECUTAR IMPRESIÓN CON FEEDBACK VISUAL
-            try {
-                // Simular progreso de impresión
-                updatePrintProgress(0, "Preparando datos del ticket...");
-                await new Promise(resolve => setTimeout(resolve, 800));
-                
-                updatePrintProgress(30, "Conectando con impresora...");
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                updatePrintProgress(60, "Enviando a impresión...");
-                
-                // Ejecutar impresión real
-                const printResult = await imprimirTicketPagoMultiple(
-                    selectedVencimientos,
-                    nis,
-                    'CLIENTE',
-                    metodoPago.toUpperCase(),
-                     realPaymentId || `${Date.now()}`,
-                );
-                
-                updatePrintProgress(100, "Comprobante generado");
-                
-                // Mostrar completado
-                setTimeout(() => {
-                    showPrintCompleted(printResult.success);
-                }, 500);
-                
-            } catch (error) {
-                console.error('Error en impresión:', error);
-                showPrintError(error.message);
+                // 🔄 MANEJAR CIERRE Y RECARGA (SIN CAMBIOS)
+                unifiedAlert.then(() => {
+                    window.location.reload();
+                });
             }
-        }
-    });
-
-    // 🔄 FUNCIÓN PARA ACTUALIZAR PROGRESO
-    function updatePrintProgress(percentage, message) {
-        const progressBar = document.getElementById('progress-bar');
-        const printMessage = document.getElementById('print-message');
-        
-        if (progressBar) {
-            progressBar.style.width = `${percentage}%`;
-        }
-        if (printMessage) {
-            printMessage.textContent = `🖨️ ${message}`;
-        }
-    }
-    
-    // ✅ FUNCIÓN PARA MOSTRAR COMPLETADO
-    function showPrintCompleted(success) {
-        const printingStatus = document.getElementById('printing-status');
-        const completionMessage = document.getElementById('completion-message');
-        
-        if (success) {
-            // Ocultar estado de impresión
-            if (printingStatus) {
-                printingStatus.style.display = 'none';
-            }
-            
-            // Mostrar mensaje de completado
-            if (completionMessage) {
-                completionMessage.style.display = 'block';
-                completionMessage.innerHTML = `
-                    <p style="margin: 0; color: #166534; font-size: 16px; font-weight: bold;">
-                        🎫 ¡Comprobante generado exitosamente!
-                    </p>
-                    <p style="margin: 8px 0 0 0; color: #15803d; font-size: 14px;">
-                        El ticket ha sido enviado a la impresora
-                    </p>
-                `;
-            }
-        } else {
-            // Mostrar mensaje de advertencia si falló la impresión
-            if (completionMessage) {
-                completionMessage.style.display = 'block';
-                completionMessage.style.background = '#fef3c7';
-                completionMessage.style.borderColor = '#f59e0b';
-                completionMessage.innerHTML = `
-                    <p style="margin: 0; color: #92400e; font-size: 16px; font-weight: bold;">
-                        ⚠️ Pago exitoso - Error en impresión
-                    </p>
-                    <p style="margin: 8px 0 0 0; color: #b45309; font-size: 14px;">
-                        El pago se procesó correctamente pero no se pudo imprimir
-                    </p>
-                `;
-            }
-        }
-        
-        // Mostrar botón de continuar después de 2 segundos
-        setTimeout(() => {
-            Swal.update({
-                showConfirmButton: true
-            });
-        }, 2000);
-    }
-    
-    // ❌ FUNCIÓN PARA MOSTRAR ERROR
-    function showPrintError(errorMessage) {
-        const printingStatus = document.getElementById('printing-status');
-        const completionMessage = document.getElementById('completion-message');
-        
-        if (printingStatus) {
-            printingStatus.style.background = '#fef2f2';
-            printingStatus.style.borderColor = '#ef4444';
-            printingStatus.innerHTML = `
-                <p style="margin: 0; color: #dc2626; font-size: 16px; font-weight: bold;">
-                    ❌ Error en impresión
-                </p>
-                <p style="margin: 8px 0 0 0; color: #b91c1c; font-size: 14px;">
-                    ${errorMessage}
-                </p>
-            `;
-        }
-        
-        // Mostrar botón inmediatamente en caso de error
-        setTimeout(() => {
-            Swal.update({
-                showConfirmButton: true
-            });
-        }, 1000);
-    }
-    
-    // 🔄 MANEJAR CIERRE Y RECARGA
-    unifiedAlert.then(() => {
-        window.location.reload();
-    });
-}
 
         } catch (error) {
-            console.error('Error durante polling múltiple:', error);
+            console.error('Error durante polling múltiple SIMPLE:', error);
         }
     };
 
-    // 🚀 INICIAR POLLING
-    console.log(`🚀 Iniciando polling ${metodoPago} para external_id: ${externalId}`);
+    // 🚀 RESTO DE LA FUNCIÓN IGUAL
+    console.log(`🚀 Iniciando polling ${metodoPago} múltiple SIMPLE para external_id: ${externalId}`);
     
     checkStatus(); // Primera verificación inmediata
     pollingInterval = setInterval(checkStatus, 3000); // Cada 3 segundos

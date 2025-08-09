@@ -444,7 +444,8 @@ const startMercadoPagoPolling = async (
         );
 
         try {
-            const response = await fetch(`${baseUrl}/api/facturas?nis=${nis}`, {
+            // 🎯 USAR EL ENDPOINT EXISTENTE (igual que MODO)
+            const response = await fetch(`${baseUrl}/api/modo/payment-status?factura=${paymentData.factura}&nis=${nis}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -454,76 +455,24 @@ const startMercadoPagoPolling = async (
             });
 
             if (response.ok) {
-                const facturas = await response.json();
-                const facturaActual = facturas.find(
-                    (f) => (f.NROFACT || f.numero) == paymentData.factura
-                );
-
-                if (!facturaActual) {
-                    console.warn('⚠️ Factura no encontrada en polling MP');
-                    return;
-                }
-
-                const estado = facturaActual.ESTADO;
-                const paymentId = facturaActual.payment_id;
-                const tienePago = paymentId !== null && paymentId !== '';
+                const data = await response.json();
+                const status = data.status;
+                const paymentId = data.payment_id;
 
                 console.log(
-                    `📊 Polling MP - Estado: ${estado}, Payment ID: ${paymentId}, Vencimiento: ${paymentData.vencimiento}`
+                    `📊 Polling MP SIMPLE - Status: ${status}, Payment ID: ${paymentId}`
                 );
 
-                // ✅ PRIMERA VEZ: GUARDAR ESTADO INICIAL
+                // ✅ PRIMERA VEZ: GUARDAR PAYMENT_ID INICIAL
                 if (attempts === 1) {
-                    estadoInicial = estado;
                     paymentIdInicial = paymentId;
-                    console.log(
-                        `📝 Estado inicial guardado - Estado: ${estadoInicial}, Payment ID: ${paymentIdInicial}`
-                    );
+                    console.log(`📝 Payment ID inicial MP: ${paymentIdInicial}`);
                     return; // No verificar en el primer intento
                 }
 
-                // ✅ LÓGICA DIFERENTE SEGÚN VENCIMIENTO
-                let pagoExitoso = false;
-
-                if (paymentData.vencimiento === '1') {
-                    // ✅ PRIMER VENCIMIENTO: Cambio a PARCIAL o EN PROCESO
-                    if (
-                        (estado === 'PARCIAL' || estado === 'EN PROCESO') &&
-                        tienePago &&
-                        estado !== estadoInicial
-                    ) {
-                        console.log(
-                            `✅ Primer vencimiento pagado: ${estadoInicial} → ${estado}`
-                        );
-                        pagoExitoso = true;
-                    }
-                } else if (paymentData.vencimiento === '2') {
-                    // ✅ SEGUNDO VENCIMIENTO: Debe cambiar de PARCIAL a EN PROCESO
-                    if (
-                        estadoInicial === 'PARCIAL' &&
-                        estado === 'EN PROCESO' &&
-                        tienePago
-                    ) {
-                        console.log(
-                            `✅ Segundo vencimiento pagado: PARCIAL → EN PROCESO`
-                        );
-                        pagoExitoso = true;
-                    }
-                    // O si el payment_id cambió (nuevo pago)
-                    else if (
-                        paymentId &&
-                        paymentId !== paymentIdInicial &&
-                        estado === 'EN PROCESO'
-                    ) {
-                        console.log(
-                            `✅ Segundo vencimiento pagado: Nuevo payment_id ${paymentIdInicial} → ${paymentId}`
-                        );
-                        pagoExitoso = true;
-                    }
-                }
-
-                if (pagoExitoso) {
-                    console.log('✅ Pago MercadoPago exitoso detectado');
+                // ✅ DETECCIÓN SIMPLE: approved + payment_id diferente al inicial
+                if (status === 'approved' && paymentId && paymentId !== paymentIdInicial) {
+                    console.log('✅ Pago MercadoPago EXITOSO detectado (método simple)');
                     clearInterval(pollInterval);
 
                     // ✅ MARCAR PAGO COMO COMPLETADO VISUALMENTE
@@ -531,7 +480,7 @@ const startMercadoPagoPolling = async (
                         window.markQRPaymentCompleted();
                     }
 
-                    // ✅ IMPRIMIR TICKET DE ÉXITO AUTOMÁTICAMENTE
+                    // ✅ IMPRIMIR TICKET DE ÉXITO AUTOMÁTICAMENTE (SIN CAMBIOS)
                     await imprimirTicketExito(
                         paymentData,
                         nis,
@@ -549,11 +498,9 @@ const startMercadoPagoPolling = async (
                     return;
                 }
 
-                if (estado === 'RECHAZADA') {
-                    console.log('❌ Pago MercadoPago rechazado - SIN IMPRESIÓN');
+                if (status === 'rejected') {
+                    console.log('❌ Pago MercadoPago rechazado (método simple)');
                     clearInterval(pollInterval);
-
-                    // 🔥 REMOVIDO: await imprimirTicketFallo(...)
 
                     Swal.close();
                     await showErrorAlert(
@@ -566,16 +513,14 @@ const startMercadoPagoPolling = async (
                 }
             } else {
                 console.error(
-                    `❌ Error en polling MP: ${response.status} ${response.statusText}`
+                    `❌ Error en polling MP SIMPLE: ${response.status} ${response.statusText}`
                 );
             }
 
             // ✅ TIMEOUT
             if (attempts >= maxAttempts) {
-                console.log('⏰ Timeout alcanzado para MercadoPago - SIN IMPRESIÓN');
+                console.log('⏰ Timeout alcanzado para MercadoPago SIMPLE');
                 clearInterval(pollInterval);
-
-                // 🔥 REMOVIDO: await imprimirTicketFallo(...)
 
                 Swal.close();
                 await showInfoAlert(
@@ -586,9 +531,9 @@ const startMercadoPagoPolling = async (
                 if (onCancel) onCancel();
             }
         } catch (error) {
-            console.error('❌ Error en polling MercadoPago:', error);
+            console.error('❌ Error en polling MercadoPago SIMPLE:', error);
         }
-    }, 5000);
+    }, 3000); // Cada 5 segundos
 
     // Cleanup si se cancela
     return () => clearInterval(pollInterval);

@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../coope"
+		},
+		{
+			"path": "../API-COOPE"
+		},
+		{
+			"path": "../TAS-CENTRAL"
+		}
+	]
+}
