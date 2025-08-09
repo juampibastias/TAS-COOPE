@@ -272,6 +272,8 @@ function FacturaCard({ factura, vencimientos, selectedVencimientos, onVencimient
         const todosPagadosOSeleccionados = vencimientosFacturaAnterior.every(v => 
             v.estado === 'pagado' || selectedVencimientos.some(s => s.id === v.id)
         );
+
+        if (vencimientosFacturaAnterior.length === 0) continue;
         
         if (!todosPagadosOSeleccionados) {
             return true; // Bloquear este vencimiento
