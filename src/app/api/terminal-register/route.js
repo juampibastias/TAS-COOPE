@@ -28,7 +28,7 @@ function getClientIP(request) {
 // Mapeo de IPs VPN a ubicaciones
 const VPN_LOCATIONS = {
     '10.10.5.21': 'Cooperativa Original',
-    '10.10.5.222': 'TAS Server Principal',
+    '10.10.5.220': 'TAS Server Principal',
 };
 
 export async function GET(request) {
@@ -53,7 +53,7 @@ export async function GET(request) {
         console.log(`🔗 [Terminal-Register] Enviando al backend - IP: ${clientIP}, Terminal: ${terminalId}`);
         
         // 🔧 ARREGLO CRÍTICO: Enviar la IP correcta al backend
-        const backendResponse = await fetch('http://10.10.5.222:3001/terminalsApi/heartbeat', {
+        const backendResponse = await fetch('http://10.10.5.220:3001/terminalsApi/heartbeat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -151,7 +151,7 @@ export async function POST(request) {
         console.log(`🔗 [Terminal-Register] POST al backend - IP: ${clientIP}, Terminal: ${terminalId}`);
         
         // 🔧 ARREGLO CRÍTICO: Enviar la IP correcta al backend
-        const backendResponse = await fetch('http://10.10.5.222:3001/terminalsApi/heartbeat', {
+        const backendResponse = await fetch('http://10.10.5.220:3001/terminalsApi/heartbeat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -5,9 +5,9 @@ import Swal from 'sweetalert2';
 // ===== CONFIGURACIÓN PARA ARQUITECTURA VPN =====
 const VPN_TAS_CONFIG = {
     // El servidor backend actúa como proxy via VPN
-    backendProxyUrl: 'http://10.10.5.222:3003/tas-coope/api/imprimir-tas/',
+    backendProxyUrl: 'http://10.10.5.220:3003/tas-coope/api/imprimir-tas/',
     // TAS-Central también puede ser usado como proxy
-    centralProxyUrl: 'http://10.10.5.222:3002/imprimir',
+    centralProxyUrl: 'http://10.10.5.220:3002/imprimir',
     // IP de la TAS en la red VPN (IP asignada por OpenVPN)
     remoteTASIP: '10.10.5.21',
     remoteTASPort: 9100,
@@ -142,7 +142,7 @@ export async function verificarConectividadVPN() {
     try {
         // Verificar Backend
         console.log('🔍 [VPN] Verificando conectividad backend...');
-        const backendResponse = await fetch('http://10.10.5.222:3003/api/health', {
+        const backendResponse = await fetch('http://10.10.5.220:3003/api/health', {
             method: 'GET',
             signal: AbortSignal.timeout(5000)
         });
@@ -150,7 +150,7 @@ export async function verificarConectividadVPN() {
 
         // Verificar TAS-Central
         console.log('🔍 [VPN] Verificando TAS-Central...');
-        const centralResponse = await fetch('http://10.10.5.222:3002/status', {
+        const centralResponse = await fetch('http://10.10.5.220:3002/status', {
             method: 'GET', 
             signal: AbortSignal.timeout(5000)
         });
@@ -200,13 +200,13 @@ async function mostrarInstruccionesVPN(datosTicket) {
                     <h3 style="margin: 0 0 15px 0; color: #fbbf24;">🔧 Estado de Conectividad:</h3>
                     <div style="font-size: 14px; line-height: 1.8;">
                         <p style="margin: 8px 0;">
-                            <strong>Backend (10.10.5.222:3003):</strong> 
+                            <strong>Backend (10.10.5.220:3003):</strong> 
                             <span style="color: ${conectividad.backend ? '#4ade80' : '#f87171'}">
                                 ${conectividad.backend ? '✅ Conectado' : '❌ Sin conexión'}
                             </span>
                         </p>
                         <p style="margin: 8px 0;">
-                            <strong>TAS-Central (10.10.5.222:3002):</strong> 
+                            <strong>TAS-Central (10.10.5.220:3002):</strong> 
                             <span style="color: ${conectividad.tascentral ? '#4ade80' : '#f87171'}">
                                 ${conectividad.tascentral ? '✅ Conectado' : '❌ Sin conexión'}
                             </span>
@@ -228,7 +228,7 @@ async function mostrarInstruccionesVPN(datosTicket) {
                     <div style="font-size: 14px; line-height: 1.8;">
                         <p style="margin: 8px 0;"><strong>1. Servidor Backend:</strong> Verificar API /imprimir-tas en puerto 3003</p>
                         <p style="margin: 8px 0;"><strong>2. TAS-Central:</strong> Reiniciar servicio en puerto 3002</p>
-                        <p style="margin: 8px 0;"><strong>3. VPN OpenVPN:</strong> Verificar túnel 10.10.5.222 ↔ 10.10.5.21</p>
+                        <p style="margin: 8px 0;"><strong>3. VPN OpenVPN:</strong> Verificar túnel 10.10.5.220 ↔ 10.10.5.21</p>
                         <p style="margin: 8px 0;"><strong>4. TAS Remoto:</strong> Reiniciar "TAS - Iniciar Servidor"</p>
                         <p style="margin: 8px 0;"><strong>5. Firewall:</strong> Verificar puerto 9100 en ambos extremos</p>
                     </div>
@@ -304,11 +304,11 @@ async function mostrarInstruccionesVPN(datosTicket) {
         });
 
         modal.querySelector('#abrirBackend').addEventListener('click', () => {
-            window.open('http://10.10.5.222:3003/api/health', '_blank');
+            window.open('http://10.10.5.220:3003/api/health', '_blank');
         });
 
         modal.querySelector('#abrirCentral').addEventListener('click', () => {
-            window.open('http://10.10.5.222:3002/status', '_blank');
+            window.open('http://10.10.5.220:3002/status', '_blank');
         });
 
         modal.querySelector('#reintentarImpresion').addEventListener('click', async () => {

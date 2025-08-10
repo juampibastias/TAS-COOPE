@@ -245,7 +245,7 @@ export async function generarTicketRespaldo(datosTicket) {
         `;
 
         // Abrir ventana de impresión
-        const printWindow = window.open('', '_blank', 'width=400,height=700');
+        //const printWindow = window.open('', '_blank', 'width=400,height=700');
         printWindow.document.write(printContent);
         printWindow.document.close();
 

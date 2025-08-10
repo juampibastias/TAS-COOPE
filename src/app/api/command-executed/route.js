@@ -24,7 +24,7 @@ function getClientIP(request) {
 // Mapeo de IPs VPN a ubicaciones (debe coincidir con terminal-register)
 const VPN_LOCATIONS = {
     '10.10.5.21': 'Cooperativa Original',
-    '10.10.5.222': 'TAS Server Principal',
+    '10.10.5.220': 'TAS Server Principal',
 };
 
 export async function POST(request) {
@@ -66,7 +66,7 @@ export async function POST(request) {
         
         // Aquí se enviaría la confirmación al backend real
         try {
-            const backendResponse = await fetch('http://10.10.5.222:3001/terminalsApi/command-executed', {
+            const backendResponse = await fetch('http://10.10.5.220:3001/terminalsApi/command-executed', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

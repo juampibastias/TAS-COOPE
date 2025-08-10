@@ -270,7 +270,7 @@ export const downloadFactura = async (factura, nis) => {
 
         // Llamar a la API para obtener el PDF
         const response = await fetch(
-            `https://staging.be.cooperativapopular.com.ar/api/scrap-factura?socio=${socio}&suministro=${suministro}&nrofactura=${factura.NROFACT}`
+            `${baseUrl}/api/scrap-factura?socio=${socio}&suministro=${suministro}&nrofactura=${factura.NROFACT}`
         );
 
         if (!response.ok) {
