@@ -379,19 +379,48 @@ export default function TASFacturasGrid({ facturasImpagas, nis }) {
 
     // ✅ CALCULAR TOTAL SELECCIONADO
     const totalSeleccionado = useMemo(() => {
-        return selectedVencimientos.reduce((sum, item) => sum + parseFloat(item.importe || 0), 0);
-    }, [selectedVencimientos]);
+    const total = selectedVencimientos.reduce((sum, item) => {
+        const importe = parseFloat(item.importe || 0);
+        return sum + importe;
+    }, 0);
+    
+    // 🔍 DEBUG TEMPORAL para verificar
+    console.log('📊 Calculando total:', {
+        selectedCount: selectedVencimientos.length,
+        items: selectedVencimientos.map(item => ({
+            factura: item.factura,
+            importe: item.importe
+        })),
+        total
+    });
+    
+    return total;
+}, [selectedVencimientos]);
 
     // ✅ MANEJAR TOGGLE DE VENCIMIENTO
     const handleVencimientoToggle = useCallback(async (vencimiento) => {
         const exists = selectedVencimientos.find(item => item.id === vencimiento.id);
 
         if (exists) {
-            // Deseleccionar
-            const newSelection = selectedVencimientos.filter(item => item.id !== vencimiento.id);
-            setSelectedVencimientos(newSelection);
-            return;
-        }
+    // ✅ LÓGICA CORREGIDA: Deseleccionar en cascada según orden de selección
+    const indiceDeseleccionado = selectedVencimientos.findIndex(item => item.id === vencimiento.id);
+    
+    // Mantener solo los items que fueron seleccionados ANTES que este
+    const newSelection = selectedVencimientos.slice(0, indiceDeseleccionado);
+    
+    // 🔍 DEBUG - Verificar qué se está manteniendo
+    console.log('🔄 Deselección en cascada:', {
+        deseleccionando: `${vencimiento.nroFactura}-${vencimiento.tipo}`,
+        indice: indiceDeseleccionado,
+        antes: selectedVencimientos.length,
+        despues: newSelection.length,
+        itemsMantenidos: newSelection.map(item => `${item.factura}: $${item.importe}`)
+    });
+    
+    // ✅ ACTUALIZAR ESTADO
+    setSelectedVencimientos(newSelection);
+    return;
+}
 
         // Seleccionar - Validar orden inmediato dentro de la misma factura
         if (vencimiento.vencimiento === '2') {
