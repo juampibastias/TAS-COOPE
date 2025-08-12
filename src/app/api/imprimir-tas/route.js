@@ -45,7 +45,7 @@ export async function GET() {
         success: true,
         servicio: 'TAS Impresion API',
         version: '2.0-app-router-vpn',
-        vpn_target: '10.10.5.21:9100',
+        vpn_target: '10.10.5.25:9100',
         timestamp: new Date().toISOString()
     });
 }
@@ -68,7 +68,7 @@ export async function POST(request) {
         const { datos } = body;
         
         // Por ahora seguimos usando la IP hardcodeada, pero ya detectamos la real
-        const targetIP = '10.10.5.21';
+        const targetIP = '10.10.5.25';
         const tasUrl = `http://${targetIP}:9100/imprimir`;
         
         console.log(`🎯 [App-API] Cliente desde: ${clientInfo.ip || 'unknown'} ${clientInfo.isVPN ? '(VPN)' : '(NO-VPN)'}`);

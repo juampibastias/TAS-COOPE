@@ -23,7 +23,7 @@ function getClientIP(request) {
 
 // Mapeo de IPs VPN a ubicaciones (debe coincidir con terminal-register)
 const VPN_LOCATIONS = {
-    '10.10.5.21': 'Cooperativa Original',
+    '10.10.5.25': 'Cooperativa Original',
     '10.10.5.220': 'TAS Server Principal',
 };
 

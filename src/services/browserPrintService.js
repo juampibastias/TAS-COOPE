@@ -9,7 +9,7 @@ const VPN_TAS_CONFIG = {
     // TAS-Central también puede ser usado como proxy
     centralProxyUrl: 'http://10.10.5.220:3002/imprimir',
     // IP de la TAS en la red VPN (IP asignada por OpenVPN)
-    remoteTASIP: '10.10.5.21',
+    remoteTASIP: '10.10.5.25',
     remoteTASPort: 9100,
     timeout: 10000,
 };
@@ -218,7 +218,7 @@ async function mostrarInstruccionesVPN(datosTicket) {
                             </span>
                         </p>
                         <p style="margin: 8px 0;">
-                            <strong>TAS Remoto:</strong> 10.10.5.21:9100 (via VPN)
+                            <strong>TAS Remoto:</strong> 10.10.5.25:9100 (via VPN)
                         </p>
                     </div>
                 </div>
@@ -228,7 +228,7 @@ async function mostrarInstruccionesVPN(datosTicket) {
                     <div style="font-size: 14px; line-height: 1.8;">
                         <p style="margin: 8px 0;"><strong>1. Servidor Backend:</strong> Verificar API /imprimir-tas en puerto 3003</p>
                         <p style="margin: 8px 0;"><strong>2. TAS-Central:</strong> Reiniciar servicio en puerto 3002</p>
-                        <p style="margin: 8px 0;"><strong>3. VPN OpenVPN:</strong> Verificar túnel 10.10.5.220 ↔ 10.10.5.21</p>
+                        <p style="margin: 8px 0;"><strong>3. VPN OpenVPN:</strong> Verificar túnel 10.10.5.220 ↔ 10.10.5.25</p>
                         <p style="margin: 8px 0;"><strong>4. TAS Remoto:</strong> Reiniciar "TAS - Iniciar Servidor"</p>
                         <p style="margin: 8px 0;"><strong>5. Firewall:</strong> Verificar puerto 9100 en ambos extremos</p>
                     </div>
