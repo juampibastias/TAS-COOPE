@@ -137,7 +137,7 @@ export default function LoginNISPage() {
 
                 if (data.length === 0) {
                     console.warn('[LOGIN AUTO] NIS incorrecto, sin datos.');
-                    setError('El número de Suministro / NIS es incorrecto.');
+                    setError('El número de Socio / Suministro es incorrecto.');
                     localStorage.removeItem('nis');
                     localStorage.removeItem('nis_timestamp');
                     setIsLoggedIn(false);
