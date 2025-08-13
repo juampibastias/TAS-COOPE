@@ -266,6 +266,7 @@ export async function imprimirTicketTermico(datosTicket) {
             text: 'No se pudo imprimir el ticket automáticamente. El pago fue exitoso.',
             confirmButtonText: 'Entendido',
             confirmButtonColor: '#059669',
+            timer: 10000,
         });
     }
 }

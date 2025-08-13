@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
  */
 export async function isLocalPrintServerAvailable() {
     try {
-        const response = await fetch('http://localhost:9100/estado', {
+        const response = await fetch('http://10.10.5.25:9100/estado', {
             method: 'GET',
             timeout: 2000
         });
@@ -90,7 +90,7 @@ export async function enviarTicketAServidorLocal(datosTicket) {
     try {
         console.log('🖨️ Enviando ticket múltiple al servidor local...', datosTicket);
 
-        const response = await fetch('http://localhost:9100/imprimir', {
+        const response = await fetch('http://10.10.5.25:9100/imprimir', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

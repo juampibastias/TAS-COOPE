@@ -92,7 +92,7 @@ const imprimirTicketExito = async (
             text: 'El pago fue exitoso pero no se pudo imprimir el comprobante.',
             confirmButtonText: 'Continuar',
             confirmButtonColor: '#059669',
-            timer: 3000,
+            timer: 10000,
         });
     }
 };

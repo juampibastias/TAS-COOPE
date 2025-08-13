@@ -124,7 +124,7 @@ const imprimirTicketAutomatico = async (
                     icon: 'warning',
                     title: 'Error de impresión',
                     text: 'No se pudo imprimir el ticket automáticamente. El pago fue exitoso.',
-                    timer: 3000,
+                    timer: 10000,
                     toast: true,
                     position: 'top-end',
                     showConfirmButton: false,
